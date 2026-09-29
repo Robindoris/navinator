@@ -1,6 +1,6 @@
 appId: dev.navinator.app
 productName: Navinator
-copyright: Copyright © 2026 Navinator
+copyright: Copyright © 2026 Robindoris
 
 directories:
   output: release
@@ -65,9 +65,9 @@ linux:
       arch: [x64, arm64]
     - target: deb
       arch: [x64]
-  maintainer: Navinator
+  maintainer: Robindoris
 
 publish:
   - provider: github
-    owner: YOUR_GITHUB_USERNAME
+    owner: Robindoris
     repo: navinator

@@ -2,8 +2,16 @@
   "name": "navinator",
   "version": "0.1.0",
   "description": "A modern, native-feeling desktop client for Navidrome",
-  "author": "Navinator",
+  "author": "Robindoris",
   "license": "MIT",
+  "homepage": "https://github.com/Robindoris/navinator#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Robindoris/navinator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Robindoris/navinator/issues"
+  },
   "private": true,
   "type": "module",
   "main": "./out/main/index.js",

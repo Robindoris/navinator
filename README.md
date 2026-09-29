@@ -8,9 +8,11 @@
 
 Electron 44 · React 19 · TypeScript · Tailwind v4 · macOS / Windows / Linux
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-emerald)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/license-MIT-emerald)](LICENSE)
 [![Navidrome](https://img.shields.io/badge/powered%20by-Subsonic%20%2F%20OpenSubsonic-10b981)](https://opensubsonic.netlify.app/docs/)
 [![pre-release](https://img.shields.io/badge/status-v0.1.0%20pre--release-amber)](#)
+
+Open source, MIT licensed. Built by [Robindoris](https://github.com/Robindoris) — issues and pull requests welcome at [github.com/Robindoris/navinator](https://github.com/Robindoris/navinator).
 
 </div>
 
@@ -148,7 +150,7 @@ Shortcuts stand down whenever a text field has focus or ⌘/Ctrl is held, so OS 
 You need **Node 20 or newer** and a reachable Navidrome (or any other Subsonic/OpenSubsonic) server. You do not need to run Navidrome locally — point it at your existing one.
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/navinator
+git clone https://github.com/Robindoris/navinator.git
 cd navinator
 npm install
 npm run dev
@@ -172,7 +174,8 @@ The window opens on a connect screen. Paste a server address — `music.example.
 
 - `electron-builder.yml` excludes `resources/` from the packaged files — it is build input only, and nothing loads from it at runtime.
 - macOS builds use a hardened runtime with `resources/entitlements.mac.plist`. Because the app is unsigned locally, macOS will still need the usual right-click → Open on first launch.
-- `appId` is `dev.navinator.app`, and the `publish:` block in `electron-builder.yml` still has a placeholder GitHub owner. Both need changing before a public release.
+- The GitHub `publish:` target is configured for `Robindoris/navinator`, so `npm run dist` can publish releases — but nothing consumes it yet, because there is no update check wired up (see [Known gaps](#known-gaps)).
+- `appId` is still `dev.navinator.app`. Change it to your own reverse-DNS identifier before a public release; it is baked into installs and cannot be changed later without breaking upgrades.
 - Linux `desktop` entries in electron-builder 26 accept only `desktopActions` and `entry`.
 
 ---
@@ -261,4 +264,6 @@ Comments in this codebase explain *why* a decision was made, not what the line d
 
 ## License
 
-MIT, per `package.json`. The `LICENSE` file itself has not been added yet.
+[MIT](LICENSE) © 2026 Robindoris. Fork it, ship it, sell it — the only requirement is keeping the copyright notice.
+
+Navidrome is a separate project under its own license; this repo is an independent client and is not affiliated with or endorsed by it.
