@@ -1,4 +1,7 @@
-appId: dev.navinator.app
+# Baked into every install and into the macOS bundle identifier, so it cannot be
+# changed later without breaking upgrades and the keychain entries of anyone who
+# already installed the app. This is the real one.
+appId: app.robindoris.navinator
 productName: Navinator
 copyright: Copyright © 2026 Robindoris
 
@@ -17,9 +20,6 @@ files:
   # here, nothing loads them at runtime.
   - '!resources/*'
 
-asarUnpack:
-  - resources/**
-
 win:
   icon: resources/icon.png
   executableName: Navinator
@@ -27,13 +27,15 @@ win:
     - target: nsis
       arch: [x64, arm64]
     - target: zip
-      arch: [x64]
+      arch: [x64, arm64]
   artifactName: ${productName}-${version}-${arch}.${ext}
 
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  # The queue, saved servers and settings live in userData, and throwing them
+  # away on uninstall is hostile to a music library app.
   deleteAppDataOnUninstall: false
   createDesktopShortcut: always
   createStartMenuShortcut: true
@@ -43,6 +45,8 @@ mac:
   category: public.app-category.music
   icon: resources/icon.png
   target:
+    # dmg is what a human downloads; zip is what Squirrel.Mac actually applies
+    # an update from. Dropping the zip silently breaks auto-update on macOS.
     - target: dmg
       arch: [x64, arm64]
     - target: zip
@@ -52,6 +56,7 @@ mac:
   gatekeeperAssess: false
   entitlements: resources/entitlements.mac.plist
   entitlementsInherit: resources/entitlements.mac.plist
+  artifactName: ${productName}-${version}-${arch}.${ext}
   extendInfo:
     NSDocumentsFolderUsageDescription: Navinator needs access to your music folder to play local files.
     NSMicrophoneUsageDescription: Navinator does not record audio.
@@ -60,12 +65,17 @@ linux:
   category: AudioVideo
   icon: resources/icon.png
   synopsis: A modern desktop client for Navidrome
+  description: >-
+    A native-feeling desktop client for Navidrome with gapless playback,
+    selective transcoding and synced lyrics. Talks only to your own server.
   target:
+    # AppImage is the only Linux target electron-updater can self-update from.
     - target: AppImage
       arch: [x64, arm64]
     - target: deb
-      arch: [x64]
+      arch: [x64, arm64]
   maintainer: Robindoris
+  artifactName: ${productName}-${version}-${arch}.${ext}
 
 publish:
   - provider: github

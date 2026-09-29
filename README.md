@@ -180,12 +180,23 @@ The window opens on a connect screen. Paste a server address — `music.example.
 | `npm run dist` | Full installers: DMG + zip (mac), NSIS + zip (win), AppImage + deb (linux) |
 | `npm run icons` | Regenerate all icons from `resources/navinator.png` |
 
+### Releases
+
+Tagged builds go out through GitHub Actions — macOS (Intel + Apple Silicon), Windows (Intel + ARM64) and Linux (x86-64 + ARM64) from one tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Installers and update feeds are published to [github.com/Robindoris/navinator/releases](https://github.com/Robindoris/navinator/releases). Signing, notarisation and the required repository secrets are documented in [RELEASING.md](RELEASING.md).
+
 ### Packaging notes
 
 - `electron-builder.yml` excludes `resources/` from the packaged files — it is build input only, and nothing loads from it at runtime.
 - macOS builds use a hardened runtime with `resources/entitlements.mac.plist`. Because the app is unsigned locally, macOS will still need the usual right-click → Open on first launch.
 - The GitHub `publish:` target is configured for `Robindoris/navinator`. `npm run dist` publishes a release there, and the built-in updater reads that feed — so a version bump plus a publish is all an update takes.
-- `appId` is still `dev.navinator.app`. Change it to your own reverse-DNS identifier before a public release; it is baked into installs and cannot be changed later without breaking upgrades.
+- `appId` is `app.robindoris.navinator`. It is baked into installs and keys the OS keychain, so it must not change once anyone has installed a build.
 - Linux `desktop` entries in electron-builder 26 accept only `desktopActions` and `entry`.
 
 ---

@@ -1,0 +1,309 @@
+name: Release
+
+# Tags are the single source of truth for a release version:
+#   git tag v0.2.0 && git push origin v0.2.0
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to the GitHub release. Off = build and verify only.'
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Mark the release as a pre-release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# Nothing is published until the final job, so cancelling a superseded tag run
+# is always safe.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # One job decides what version we are building, so every job agrees.
+  # ---------------------------------------------------------------------------
+  prepare:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: resolve
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="v$(node -p "require('./package.json').version")"
+          fi
+
+          version="${tag#v}"
+
+          if [[ -z "$version" || "$version" == "$tag" ]]; then
+            echo "::error::Could not read a version from '$tag'."
+            exit 1
+          fi
+
+          # A suffix on the tag is the caller's explicit statement that this is
+          # not a stable release; a manual run can also ask for one.
+          if [[ "$tag" == *-* ]]; then
+            prerelease=true
+          elif [[ "${{ inputs.prerelease }}" == "true" ]]; then
+            prerelease=true
+          else
+            prerelease=false
+          fi
+
+          echo "version=$version"      >> "$GITHUB_OUTPUT"
+          echo "tag=$tag"              >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "Building $tag (prerelease=$prerelease)"
+
+  # ---------------------------------------------------------------------------
+  # Typecheck once, before spending three runners on a build that cannot ship.
+  # ---------------------------------------------------------------------------
+  verify:
+    name: Typecheck
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # The check never launches Electron, and the download would dominate an
+      # otherwise two-second job.
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm run typecheck
+
+  # ---------------------------------------------------------------------------
+  # Build matrix — one job per platform, not per architecture.
+  #
+  # This is deliberate. `latest-mac.yml` and `latest.yml` are the manifests
+  # electron-updater reads, and each lists every architecture for its platform.
+  # Building x64 and arm64 in *separate* jobs produces two `latest-mac.yml`
+  # files that each list one arch, and whichever is merged last silently
+  # deletes the other from the update feed. One electron-builder invocation
+  # per platform emits a single correct manifest.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: [prepare, verify]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: windows-latest
+            platform: win
+          - os: ubuntu-latest
+            platform: linux
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # Electron and the electron-builder toolchain are large immutable
+      # downloads; caching them saves several minutes per job.
+      - name: Cache electron downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/Library/Caches/electron
+            ~/AppData/Local/electron/Cache
+          key: electron-${{ runner.os }}-${{ matrix.platform }}-${{ hashFiles('package-lock.json') }}
+
+      - run: npm ci
+
+      # The tag is authoritative. Without this the installers would be labelled
+      # with whatever the last committed version happened to be.
+      - name: Apply release version
+        run: npm pkg set version="${{ needs.prepare.outputs.version }}"
+        shell: bash
+
+      - run: npm run icons
+      - run: npm run build
+
+      - name: Build installers
+        # macOS x64 is cross-built on the arm64 runner. Only the zip/dmg tooling
+        # is host-native, and both operate on plain files, so no Rosetta or
+        # emulation is required — it is just slower.
+        run: npx electron-builder --${{ matrix.platform }} --x64 --arm64 --publish never
+        env:
+          # Signing is opt-in. With no secrets set, electron-builder skips it and
+          # still produces working, unsigned installers.
+          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK || secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || secrets.WIN_CSC_KEY_PASSWORD }}
+          # electron-builder notarises automatically when these are present.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Without this, an unsigned build picks up whatever identity happens to
+          # be in the runner's keychain and fails for an unrelated reason.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Sanity-check the output
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The manifest electron-updater polls for must exist, or auto-update
+          # silently does nothing on this platform.
+          case "${{ matrix.platform }}" in
+            mac)   manifest=latest-mac.yml ;;
+            win)   manifest=latest.yml ;;
+            linux) manifest=latest-linux.yml ;;
+          esac
+          if ! find release -name "$manifest" -print -quit | grep -q .; then
+            echo "::error::$manifest was not generated — auto-update will be broken."
+            exit 1
+          fi
+          echo "Found update manifest: $manifest"
+          find release -name "$manifest" -exec cat {} \;
+
+      # The unpacked app directories are 200-400 MB each and are only
+      # intermediates. Stripping them keeps the artifact small and keeps the
+      # release page free of junk.
+      - name: Remove unpacked directories
+        shell: bash
+        run: |
+          find release -maxdepth 2 -type d -name '*-unpacked' -prune -exec rm -rf {} + || true
+
+      - name: Collect distributables
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # Everything electron-updater needs: the installers themselves, the
+          # .blockmap differential data, and the latest*.yml feed files.
+          find release -type f \
+            \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.msi' \
+               -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \
+               -o -name '*.blockmap' -o -name 'latest*.yml' \) \
+            -exec cp {} dist/ \;
+          ls -la dist
+          test -n "$(ls -A dist)" || { echo "::error::No distributables produced."; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.platform }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Publish once, from one place, so two runners never race to create the same
+  # GitHub release.
+  # ---------------------------------------------------------------------------
+  release:
+    name: Publish release
+    needs: [prepare, build]
+    if: github.ref_type == 'tag' || inputs.publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: build-*
+          merge-multiple: false
+          path: artifacts
+
+      - name: Merge and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p publish
+
+          # Each artifact landed in its own directory; flatten them all into one
+          # release folder. Filenames are unique by construction: every
+          # artifactName includes the architecture, and the manifests are named
+          # per platform.
+          find artifacts -type f -exec cp {} publish/ \;
+
+          cd publish
+          ls -la
+
+          # The update manifests are checksummed alongside everything else; they
+          # are small, and shipping a checksum for every file we publish is
+          # easier to reason about than an exception.
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create the GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          # Re-publishing a tag is treated as a rebuild-and-replace rather than
+          # an error, because that is what you want after a CI hiccup. The tag
+          # itself is left in place.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists — replacing its assets."
+            gh release delete "$TAG" --yes
+          fi
+
+          if [[ "$PRERELEASE" == "true" ]]; then
+            gh release create "$TAG" \
+              --title "Navinator $VERSION" \
+              --generate-notes \
+              --prerelease \
+              publish/*
+          else
+            gh release create "$TAG" \
+              --title "Navinator $VERSION" \
+              --generate-notes \
+              publish/*
+          fi
+
+  # ---------------------------------------------------------------------------
+  # A dry run proves the installers build without publishing anything.
+  # ---------------------------------------------------------------------------
+  summary:
+    name: Build summary
+    needs: [prepare, verify, build, release]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Result
+        run: |
+          {
+            echo "### Release ${{ needs.prepare.outputs.tag || 'skipped' }}"
+            echo ""
+            echo "| job | result |"
+            echo "|---|---|"
+            echo "| typecheck | ${{ needs.verify.result }} |"
+            echo "| build | ${{ needs.build.result }} |"
+            echo "| release | ${{ needs.release.result || 'skipped (dry run)' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

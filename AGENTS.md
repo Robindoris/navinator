@@ -13,12 +13,19 @@
   - Icon pipeline: `resources/navinator.png` is the master logo. `npm run icons` (`scripts/generate-icons.mjs`) decodes it and regenerates `resources/icon.png` (1024, electron-builder source), `resources/tray.png` (64) and `src/renderer/public/navinator.png` (512, favicon + in-app mark). Never hand-edit the generated files; replace the master and re-run
   - `electron-builder.yml` points mac entitlements at `resources/entitlements.mac.plist` and all three platforms at `resources/icon.png`
   - In electron-builder 26, `linux.desktop` only accepts `desktopActions` and `entry`
+  - `appId` is `app.robindoris.navinator`. It is baked into the mac bundle id and the Windows registry, and it keys the OS keychain holding saved server passwords. It must not change once a build has shipped
+  - Releases are cut by pushing a `v*` tag; `.github/workflows/release.yml` builds mac/win/linux and publishes the GitHub release. See `RELEASING.md`
+  - That workflow builds **one job per platform, not per architecture**, on purpose: `latest-mac.yml` and `latest.yml` are single manifests listing every arch for their platform, and splitting the arches across jobs makes them overwrite each other
+  - The macOS `zip` target is not redundant with `dmg` — Squirrel.Mac applies updates from the zip. Dropping it breaks macOS auto-update only
+  - `electron-updater` must stay in `dependencies`, not `devDependencies`. electron-builder only ships `dependencies` inside the asar, and `src/main/updater.ts` imports it at runtime
 - **Work Guidance**:
   - Add a dependency only after confirming it is already in `package.json`
   - Keep the preload bridge narrow; new privileged operations need an entry in `src/shared/ipc.ts`
+  - A new keybinding goes in `src/shared/shortcuts.ts` once, not into `useShortcuts.ts` and the Settings table separately. That duplication is how `?` ended up dispatching an event nobody listened to
 - **Verification**:
   - `npm run typecheck`
   - `npx electron-vite build`
   - `npm run icons` after any logo change
   - `npx electron-builder --dir --mac` to confirm the packaged `.app` icon (`CFBundleIconFile` -> `icon.icns`)
+  - After a dependency change, confirm it landed in the asar: `npx asar list release/mac-arm64/Navinator.app/Contents/Resources/app.asar | grep <pkg>`
 - **Child DOX Index**: none
