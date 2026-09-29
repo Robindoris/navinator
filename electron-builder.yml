@@ -1,0 +1,73 @@
+appId: dev.navinator.app
+productName: Navinator
+copyright: Copyright © 2026 Navinator
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!scripts/*'
+  - '!electron.vite.config.ts'
+  - '!{.eslintrc,.prettierrc,.editorconfig,.gitignore}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  # Build inputs only: electron-builder reads the icons and entitlements from
+  # here, nothing loads them at runtime.
+  - '!resources/*'
+
+asarUnpack:
+  - resources/**
+
+win:
+  icon: resources/icon.png
+  executableName: Navinator
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64]
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: ${productName}
+
+mac:
+  category: public.app-category.music
+  icon: resources/icon.png
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  darkModeSupport: true
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  extendInfo:
+    NSDocumentsFolderUsageDescription: Navinator needs access to your music folder to play local files.
+    NSMicrophoneUsageDescription: Navinator does not record audio.
+
+linux:
+  category: AudioVideo
+  icon: resources/icon.png
+  synopsis: A modern desktop client for Navidrome
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64]
+  maintainer: Navinator
+
+publish:
+  - provider: github
+    owner: YOUR_GITHUB_USERNAME
+    repo: navinator

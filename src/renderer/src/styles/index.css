@@ -1,0 +1,287 @@
+@import 'tailwindcss';
+
+/*
+ * Theme tokens.
+ *
+ * Both palettes are declared as raw CSS variables and then mapped into
+ * Tailwind with `@theme inline`, so `bg-surface` / `text-muted` resolve to the
+ * right value for the active theme without duplicating utility classes.
+ *
+ * Colour themes are a separate axis from light/dark: `[data-accent]` picks the
+ * palette, `[data-theme]` picks the mode, and every palette declares both. The
+ * neutral ramps are shared — only the accent family changes per theme — so a
+ * new theme costs six values rather than a full set of twenty.
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* Neutral surfaces are mode-dependent but not palette-dependent. */
+:root,
+[data-theme='light'] {
+  --nav-bg: oklch(97.5% 0.003 286);
+  --nav-surface: oklch(100% 0 0);
+  --nav-surface-2: oklch(96% 0.004 286);
+  --nav-surface-3: oklch(92.5% 0.005 286);
+  --nav-border: oklch(90% 0.006 286);
+  --nav-fg: oklch(21% 0.012 286);
+  --nav-muted: oklch(50% 0.012 286);
+  --nav-faint: oklch(64% 0.01 286);
+  --nav-danger: oklch(58% 0.21 25);
+  --nav-success: oklch(60% 0.15 155);
+  --nav-shadow: 0 1px 2px oklch(0% 0 0 / 0.06), 0 8px 24px oklch(0% 0 0 / 0.06);
+  --nav-shadow-lg: 0 2px 6px oklch(0% 0 0 / 0.1), 0 24px 60px oklch(0% 0 0 / 0.14);
+}
+
+[data-theme='dark'] {
+  --nav-bg: oklch(16% 0.008 286);
+  --nav-surface: oklch(19.5% 0.009 286);
+  --nav-surface-2: oklch(23% 0.011 286);
+  --nav-surface-3: oklch(27% 0.013 286);
+  --nav-border: oklch(29% 0.012 286);
+  --nav-fg: oklch(96% 0.004 286);
+  --nav-muted: oklch(72% 0.012 286);
+  --nav-faint: oklch(58% 0.012 286);
+  --nav-danger: oklch(65% 0.19 25);
+  --nav-success: oklch(70% 0.15 155);
+  --nav-shadow: 0 1px 2px oklch(0% 0 0 / 0.4), 0 8px 24px oklch(0% 0 0 / 0.3);
+  --nav-shadow-lg: 0 2px 6px oklch(0% 0 0 / 0.5), 0 24px 60px oklch(0% 0 0 / 0.45);
+}
+
+/*
+ * Accent families.
+ *
+ * `hover` and `soft` are the two derived values every interactive state needs;
+ * `fg` is whatever reads correctly on top of the accent. In dark mode the
+ * accent is lighter than its light-mode counterpart, which is why `fg` flips to
+ * near-black there — the same contrast rule a light UI needs.
+ */
+/*
+ * `:root` is listed alongside violet so an accent is always defined, even for
+ * the first paint before React sets `data-accent`. Without it the app would
+ * boot with `bg-accent` resolving to nothing.
+ */
+:root,
+[data-accent='violet'] {
+  --nav-accent: oklch(58% 0.2 292);
+  --nav-accent-hover: oklch(52% 0.21 292);
+  --nav-accent-fg: oklch(99% 0 0);
+  --nav-accent-soft: oklch(95% 0.03 292);
+}
+[data-theme='dark'][data-accent='violet'] {
+  --nav-accent: oklch(68% 0.17 292);
+  --nav-accent-hover: oklch(74% 0.16 292);
+  --nav-accent-fg: oklch(17% 0.02 292);
+  --nav-accent-soft: oklch(30% 0.06 292);
+}
+
+[data-accent='ocean'] {
+  --nav-accent: oklch(58% 0.15 233);
+  --nav-accent-hover: oklch(52% 0.16 233);
+  --nav-accent-fg: oklch(99% 0 0);
+  --nav-accent-soft: oklch(95% 0.03 233);
+}
+[data-theme='dark'][data-accent='ocean'] {
+  --nav-accent: oklch(70% 0.14 230);
+  --nav-accent-hover: oklch(76% 0.13 230);
+  --nav-accent-fg: oklch(17% 0.03 233);
+  --nav-accent-soft: oklch(30% 0.055 233);
+}
+
+[data-accent='emerald'] {
+  --nav-accent: oklch(58% 0.14 163);
+  --nav-accent-hover: oklch(52% 0.15 163);
+  --nav-accent-fg: oklch(99% 0 0);
+  --nav-accent-soft: oklch(95% 0.03 163);
+}
+[data-theme='dark'][data-accent='emerald'] {
+  --nav-accent: oklch(72% 0.16 163);
+  --nav-accent-hover: oklch(78% 0.15 163);
+  --nav-accent-fg: oklch(17% 0.03 163);
+  --nav-accent-soft: oklch(30% 0.05 163);
+}
+
+[data-accent='amber'] {
+  --nav-accent: oklch(68% 0.15 70);
+  --nav-accent-hover: oklch(62% 0.16 65);
+  --nav-accent-fg: oklch(22% 0.05 70);
+  --nav-accent-soft: oklch(95% 0.04 80);
+}
+[data-theme='dark'][data-accent='amber'] {
+  --nav-accent: oklch(78% 0.15 78);
+  --nav-accent-hover: oklch(84% 0.14 82);
+  --nav-accent-fg: oklch(20% 0.05 70);
+  --nav-accent-soft: oklch(32% 0.06 75);
+}
+
+[data-accent='rose'] {
+  --nav-accent: oklch(58% 0.2 15);
+  --nav-accent-hover: oklch(52% 0.21 15);
+  --nav-accent-fg: oklch(99% 0 0);
+  --nav-accent-soft: oklch(95% 0.03 15);
+}
+[data-theme='dark'][data-accent='rose'] {
+  --nav-accent: oklch(70% 0.17 15);
+  --nav-accent-hover: oklch(76% 0.16 15);
+  --nav-accent-fg: oklch(17% 0.03 15);
+  --nav-accent-soft: oklch(31% 0.07 15);
+}
+
+[data-accent='nord'] {
+  --nav-accent: oklch(55% 0.08 250);
+  --nav-accent-hover: oklch(49% 0.09 250);
+  --nav-accent-fg: oklch(99% 0 0);
+  --nav-accent-soft: oklch(95% 0.02 250);
+}
+[data-theme='dark'][data-accent='nord'] {
+  --nav-accent: oklch(72% 0.06 230);
+  --nav-accent-hover: oklch(78% 0.055 225);
+  --nav-accent-fg: oklch(18% 0.02 250);
+  --nav-accent-soft: oklch(29% 0.03 250);
+}
+
+[data-accent='citrus'] {
+  --nav-accent: oklch(64% 0.17 128);
+  --nav-accent-hover: oklch(58% 0.18 128);
+  --nav-accent-fg: oklch(20% 0.05 128);
+  --nav-accent-soft: oklch(95% 0.05 128);
+}
+[data-theme='dark'][data-accent='citrus'] {
+  --nav-accent: oklch(80% 0.17 128);
+  --nav-accent-hover: oklch(86% 0.16 128);
+  --nav-accent-fg: oklch(20% 0.05 128);
+  --nav-accent-soft: oklch(31% 0.06 128);
+}
+
+/*
+ * Graphite is deliberately achromatic: the accent tracks the foreground, so
+ * every accent-tinted surface becomes a neutral grey rather than a colour.
+ */
+[data-accent='graphite'] {
+  --nav-accent: oklch(48% 0.005 286);
+  --nav-accent-hover: oklch(42% 0.005 286);
+  --nav-accent-fg: oklch(99% 0 0);
+  --nav-accent-soft: oklch(93% 0.003 286);
+}
+[data-theme='dark'][data-accent='graphite'] {
+  --nav-accent: oklch(78% 0.004 286);
+  --nav-accent-hover: oklch(84% 0.004 286);
+  --nav-accent-fg: oklch(18% 0.004 286);
+  --nav-accent-soft: oklch(29% 0.006 286);
+}
+
+
+@theme inline {
+  --color-bg: var(--nav-bg);
+  --color-surface: var(--nav-surface);
+  --color-surface-2: var(--nav-surface-2);
+  --color-surface-3: var(--nav-surface-3);
+  --color-line: var(--nav-border);
+  --color-fg: var(--nav-fg);
+  --color-muted: var(--nav-muted);
+  --color-faint: var(--nav-faint);
+  --color-accent: var(--nav-accent);
+  --color-accent-hover: var(--nav-accent-hover);
+  --color-accent-fg: var(--nav-accent-fg);
+  --color-accent-soft: var(--nav-accent-soft);
+  --color-danger: var(--nav-danger);
+  --color-success: var(--nav-success);
+
+  --radius-app: 0.75rem;
+
+  --font-sans:
+    'Inter var', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--nav-border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--nav-bg);
+    color: var(--nav-fg);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    /* Desktop app: text selection is opt-in, not the default. */
+    user-select: none;
+    cursor: default;
+  }
+
+  input,
+  textarea,
+  [data-selectable] {
+    user-select: text;
+  }
+
+  ::selection {
+    background-color: var(--nav-accent);
+    color: var(--nav-accent-fg);
+  }
+
+  /* Slim, unobtrusive scrollbars that only appear against their own surface. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--nav-surface-3);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--nav-faint);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--nav-accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Drag region for the frameless title bar. */
+  .app-drag {
+    -webkit-app-region: drag;
+  }
+  .app-no-drag {
+    -webkit-app-region: no-drag;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  /* Fades a scrolling list out at the edges instead of hard-cutting it. */
+  .mask-fade-b {
+    mask-image: linear-gradient(to bottom, black calc(100% - 2.5rem), transparent 100%);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

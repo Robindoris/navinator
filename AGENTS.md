@@ -1,0 +1,24 @@
+# Navinator
+
+- **Purpose**: A modern, native-feeling desktop client for Navidrome
+- **Ownership**: Navinator project
+- **Local Contracts**:
+  - Stack: Electron 44 + electron-vite + React 19 + TypeScript + Tailwind v4
+  - Entry points: `src/main/index.ts`, `src/preload/index.ts`, `src/renderer/index.html`
+  - Renderer Vite root is `src/renderer`, so static assets live in `src/renderer/public`; a repo-root `public/` is not served
+  - `base: './'` in the renderer build, so all renderer asset URLs must be relative (packaged app loads over the `navinator:` scheme)
+  - `@shared` aliases `src/shared` in main, preload and renderer
+  - The renderer has no Node access; every privileged operation goes through the preload bridge
+  - `resources/` holds build inputs only and is excluded from the packaged app. Nothing loads from it at runtime
+  - Icon pipeline: `resources/navinator.png` is the master logo. `npm run icons` (`scripts/generate-icons.mjs`) decodes it and regenerates `resources/icon.png` (1024, electron-builder source), `resources/tray.png` (64) and `src/renderer/public/navinator.png` (512, favicon + in-app mark). Never hand-edit the generated files; replace the master and re-run
+  - `electron-builder.yml` points mac entitlements at `resources/entitlements.mac.plist` and all three platforms at `resources/icon.png`
+  - In electron-builder 26, `linux.desktop` only accepts `desktopActions` and `entry`
+- **Work Guidance**:
+  - Add a dependency only after confirming it is already in `package.json`
+  - Keep the preload bridge narrow; new privileged operations need an entry in `src/shared/ipc.ts`
+- **Verification**:
+  - `npm run typecheck`
+  - `npx electron-vite build`
+  - `npm run icons` after any logo change
+  - `npx electron-builder --dir --mac` to confirm the packaged `.app` icon (`CFBundleIconFile` -> `icon.icns`)
+- **Child DOX Index**: none
