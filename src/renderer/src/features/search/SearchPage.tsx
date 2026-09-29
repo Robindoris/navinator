@@ -2,14 +2,27 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Search as SearchIcon, Music2, Play, Shuffle, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { search } from '../../lib/api'
+import {
+  NO_SEARCH_OFFSETS,
+  SEARCH_PAGE,
+  search,
+  type SearchOffsets
+} from '../../lib/api'
 import { queryKeys, STALE } from '../../lib/query-keys'
 import { useServerId } from '../../store/server'
-import { useLibraryNavigation, usePlayAlbum, usePlayArtist, usePlayPlaylist, usePlaySongs } from '../shared/hooks'
+import {
+  useLibraryNavigation,
+  usePlayAlbum,
+  usePlayArtist,
+  usePlayPlaylist,
+  usePlaySongs,
+  useTrackAnnotations
+} from '../shared/hooks'
 import { AlbumGrid, PageHeader, Section } from '../shared/Page'
-import { EmptyState, Skeleton, IconButton } from '../../components/ui/primitives'
+import { EmptyState, Skeleton, IconButton, Button } from '../../components/ui/primitives'
 import { ArtistCard, PlaylistCard } from '../../components/items/Cards'
 import { TrackRow, TrackHeader } from '../../components/items/TrackRow'
+import { requestAddToPlaylist } from '../../components/items/AddToPlaylistDialog'
 import { usePlayer } from '../../store/player'
 
 /** Debounces keystrokes so typing does not fire a request per character. */
@@ -34,6 +47,7 @@ export function SearchPage() {
   const playPlaylist = usePlayPlaylist()
   const addToQueue = usePlayer((s) => s.addToQueue)
   const playNext = usePlayer((s) => s.playNextInQueue)
+  const { onStar, onRate } = useTrackAnnotations()
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
   const shuffle = usePlayer((s) => s.shuffle)
 
@@ -44,11 +58,27 @@ export function SearchPage() {
     return () => window.removeEventListener('navinator:focus-search', focus)
   }, [])
 
+  /**
+   * Search is paged per section: one `search3` call covers all four types, so
+   * "more songs" and "more artists" cannot be requested independently without
+   * losing the others. The offsets are tracked per type and the first page is
+   * the only one loaded automatically; the rest arrive when asked for.
+   */
+  const [offsets, setOffsets] = useState<SearchOffsets>(NO_SEARCH_OFFSETS)
+  const enabled = Boolean(serverId && debounced.trim().length >= 2)
+
+  // A new term must start from a clean slate, or stale offsets would skip
+  // straight past the top of the new result set.
+  useEffect(() => setOffsets(NO_SEARCH_OFFSETS), [debounced])
+
   const query = useQuery({
-    queryKey: queryKeys.search(serverId!, debounced),
-    queryFn: () => search(debounced),
-    enabled: Boolean(serverId && debounced.trim().length >= 2),
-    staleTime: STALE.library
+    queryKey: queryKeys.search(serverId!, debounced, offsets),
+    queryFn: () => search(debounced, { ...SEARCH_PAGE }, offsets),
+    enabled,
+    staleTime: STALE.library,
+    // Every offset change is a new query, so results should swap rather than
+    // leave the previous page's rows on screen.
+    placeholderData: (previous) => previous
   })
 
   const results = useMemo(() => {
@@ -63,6 +93,21 @@ export function SearchPage() {
   }, [query.data])
 
   const total = results.artists.length + results.albums.length + results.songs.length + results.playlists.length
+
+  /**
+   * A section is exhausted when it came back short, which is the only
+   * end-of-list signal `search3` gives.
+   */
+  const canLoadMore = (kind: keyof SearchOffsets, shown: number): boolean => {
+    if (!enabled || query.isFetching) return false
+    const page = SEARCH_PAGE[kind]
+    return offsets[kind] > 0 ? shown % page !== 0 : true
+  }
+
+  const loadMore = (kind: keyof SearchOffsets, shown: number) => {
+    if (shown === 0) return
+    setOffsets((current) => ({ ...current, [kind]: current[kind] + SEARCH_PAGE[kind] }))
+  }
 
   return (
     <div className="space-y-8">
@@ -124,7 +169,7 @@ export function SearchPage() {
           {results.artists.length > 0 && (
             <Section title={`Artists (${results.artists.length})`}>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-1">
-                {results.artists.slice(0, 12).map((item) => (
+                {results.artists.map((item) => (
                   <ArtistCard
                     key={item.id}
                     artist={item}
@@ -135,6 +180,12 @@ export function SearchPage() {
                   />
                 ))}
               </div>
+              <ShowMore
+                kind="artist"
+                canLoadMore={canLoadMore('artist', results.artists.length)}
+                onLoadMore={() => loadMore('artist', results.artists.length)}
+                busy={query.isFetching}
+              />
             </Section>
           )}
 
@@ -157,6 +208,12 @@ export function SearchPage() {
                 albums={results.albums}
                 onOpen={(item) => album(item.id)}
                 onPlay={(item) => void playAlbum(item.id, item)}
+              />
+              <ShowMore
+                kind="album"
+                canLoadMore={canLoadMore('album', results.albums.length)}
+                onLoadMore={() => loadMore('album', results.albums.length)}
+                busy={query.isFetching}
               />
             </Section>
           )}
@@ -202,9 +259,18 @@ export function SearchPage() {
                     onGoToArtist={() => song.artistId && artist(song.artistId)}
                     onPlayNext={(items) => playNext(items)}
                     onAddToQueue={(items) => addToQueue(items)}
+                    onAddToPlaylist={(items) => requestAddToPlaylist(items.map((item) => item.id))}
+                    onStar={onStar}
+                    onRate={onRate}
                   />
                 ))}
               </div>
+              <ShowMore
+                kind="song"
+                canLoadMore={canLoadMore('song', results.songs.length)}
+                onLoadMore={() => loadMore('song', results.songs.length)}
+                busy={query.isFetching}
+              />
             </Section>
           )}
 
@@ -220,10 +286,40 @@ export function SearchPage() {
                   />
                 ))}
               </div>
+              <ShowMore
+                kind="playlist"
+                canLoadMore={canLoadMore('playlist', results.playlists.length)}
+                onLoadMore={() => loadMore('playlist', results.playlists.length)}
+                busy={query.isFetching}
+              />
             </Section>
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/** "Show more" for one search section. */
+function ShowMore({
+  kind,
+  canLoadMore,
+  onLoadMore,
+  busy
+}: {
+  kind: keyof SearchOffsets
+  canLoadMore: boolean
+  onLoadMore: () => void
+  busy: boolean
+}) {
+  // A section that came back exactly full might have more; one that came back
+  // short is definitely the end, so the button hides itself.
+  if (!canLoadMore) return null
+  return (
+    <div className="pt-2">
+      <Button variant="ghost" size="sm" onClick={onLoadMore} disabled={busy}>
+        {busy ? 'Loading…' : `Show more ${kind}s`}
+      </Button>
     </div>
   )
 }

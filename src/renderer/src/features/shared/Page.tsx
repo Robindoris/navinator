@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { Album } from '@shared/types'
 import { AlbumCard } from '../../components/items/Cards'
 import { Skeleton } from '../../components/ui/primitives'
+import { useSettings } from '../../store/settings'
 import { cn } from '../../lib/utils'
 
 export function PageHeader({
@@ -63,7 +64,9 @@ export function AlbumGrid({
   emptyMessage?: string
   className?: string
 }) {
-  if (loading) return <AlbumGridSkeleton />
+  const compact = useSettings((state) => state.settings.compactAlbumGrid)
+
+  if (loading) return <AlbumGridSkeleton compact={compact} />
 
   if (albums.length === 0) {
     return (
@@ -75,22 +78,38 @@ export function AlbumGrid({
 
   return (
     <div
+      data-compact={compact || undefined}
       className={cn(
         'grid gap-1',
         'grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(11rem,1fr))]',
+        // The grid is driven off a data attribute rather than a prop so the
+        // token set lives in one place in the stylesheet; see index.css.
+        'data-[compact]:grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] data-[compact]:gap-0.5',
         className
       )}
     >
       {albums.map((album) => (
-        <AlbumCard key={album.id} album={album} onOpen={onOpen} onPlay={onPlay} />
+        <AlbumCard
+          key={album.id}
+          album={album}
+          onOpen={onOpen}
+          onPlay={onPlay}
+          dense={compact}
+        />
       ))}
     </div>
   )
 }
 
-export function AlbumGridSkeleton({ count = 12 }: { count?: number }) {
+export function AlbumGridSkeleton({ count = 12, compact = false }: { count?: number; compact?: boolean }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-1">
+    <div
+      data-compact={compact || undefined}
+      className={cn(
+        'grid gap-1 grid-cols-[repeat(auto-fill,minmax(11rem,1fr))]',
+        'data-[compact]:grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] data-[compact]:gap-0.5'
+      )}
+    >
       {Array.from({ length: count }, (_, index) => (
         <div key={index} className="space-y-2 p-2">
           <Skeleton className="aspect-square w-full rounded-lg" />

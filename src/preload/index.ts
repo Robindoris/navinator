@@ -25,7 +25,10 @@ const bridge: NavinatorBridge = {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
     close: () => ipcRenderer.invoke('window:close'),
-    setFullScreen: (value: boolean) => ipcRenderer.invoke('window:setFullScreen', value)
+    setFullScreen: (value: boolean) => ipcRenderer.invoke('window:setFullScreen', value),
+    checkForUpdates: (manual = false) => ipcRenderer.invoke('app:checkForUpdates', manual),
+    installUpdate: () => ipcRenderer.invoke('app:installUpdate'),
+    updatesAvailable: () => ipcRenderer.invoke('app:updatesAvailable')
   },
   servers: {
     list: () => ipcRenderer.invoke('servers:list'),
@@ -47,7 +50,8 @@ const bridge: NavinatorBridge = {
   },
   on: {
     connectionChanged: (cb) => subscribe('connection:changed', cb),
-    menuAction: (cb) => subscribe('menu:action', cb)
+    menuAction: (cb) => subscribe('menu:action', cb),
+    updateState: (cb) => subscribe('update:state', cb)
   }
 }
 

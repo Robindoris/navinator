@@ -6,7 +6,8 @@ import type {
   MenuAction,
   ProbeResult,
   ServerProfile,
-  ServerProfileInput
+  ServerProfileInput,
+  UpdateState
 } from './types'
 
 /**
@@ -37,6 +38,10 @@ export interface IpcInvokeMap {
   'window:toggleMaximize': { args: []; ret: void }
   'window:close': { args: []; ret: void }
   'window:setFullScreen': { args: [value: boolean]; ret: void }
+
+  'app:checkForUpdates': { args: [manual: boolean]; ret: void }
+  'app:installUpdate': { args: []; ret: void }
+  'app:updatesAvailable': { args: []; ret: boolean }
 }
 
 export type IpcChannel = keyof IpcInvokeMap
@@ -46,6 +51,7 @@ export interface IpcEventMap {
   'connection:changed': ConnectionInfo
   'menu:action': MenuAction
   'protocol:cover': { url: string }
+  'update:state': UpdateState
 }
 
 export type IpcEvent = keyof IpcEventMap
@@ -65,6 +71,9 @@ export interface NavinatorBridge {
     toggleMaximize(): Promise<void>
     close(): Promise<void>
     setFullScreen(value: boolean): Promise<void>
+    checkForUpdates(manual?: boolean): Promise<void>
+    installUpdate(): Promise<void>
+    updatesAvailable(): Promise<boolean>
   }
   servers: {
     list(): Promise<ServerProfile[]>
@@ -87,5 +96,6 @@ export interface NavinatorBridge {
   on: {
     connectionChanged(cb: (info: ConnectionInfo) => void): () => void
     menuAction(cb: (action: MenuAction) => void): () => void
+    updateState(cb: (state: UpdateState) => void): () => void
   }
 }

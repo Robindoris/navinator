@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import type { Song, Album, Playlist } from '@shared/types'
 import { useServerId } from '../../store/server'
 import { usePlayer } from '../../store/player'
@@ -50,6 +51,41 @@ export function useAlbumListQuery(type: Parameters<typeof getAlbumList>[0], extr
     enabled: Boolean(serverId),
     staleTime: type === 'random' ? 0 : STALE.library
   })
+}
+
+/**
+ * Album lists, paged.
+ *
+ * `getAlbumList2` is offset-paginated on Navidrome, so a library of any size can
+ * be walked a page at a time instead of being truncated. A short page is the
+ * only reliable end-of-list signal — Subsonic gives no total count — so the
+ * query stops asking once one comes back under `PAGE_SIZE`.
+ *
+ * `random` is deliberately *not* paged: offsets into a randomised ordering are
+ * not stable, so page 2 would not continue page 1.
+ */
+const ALBUM_PAGE_SIZE = 100
+
+export function useAlbumListPages(
+  type: Parameters<typeof getAlbumList>[0],
+  extra?: Record<string, unknown>
+) {
+  const serverId = useServerId()
+  const paged = type !== 'random'
+
+  const query = useInfiniteQuery({
+    queryKey: queryKeys.albumList(serverId!, type, extra),
+    queryFn: ({ pageParam }) => getAlbumList(type, ALBUM_PAGE_SIZE, pageParam, extra),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => (paged && lastPage.length === ALBUM_PAGE_SIZE ? lastPage.length : undefined),
+    enabled: Boolean(serverId),
+    staleTime: type === 'random' ? 0 : STALE.library
+  })
+
+  return {
+    ...query,
+    albums: (query.data?.pages ?? []).flat()
+  }
 }
 
 export function useAlbumQuery(id: string) {
@@ -202,16 +238,54 @@ function toggleStarInTree(
   return next
 }
 
+/**
+ * Sets a 1–5 star rating, or clears it with 0.
+ *
+ * Optimistic for the same reason `useToggleStar` is: the star control sits next
+ * to the track title, so a round trip would make it feel broken. A failure
+ * refetches the server's copy rather than trying to invert the change, because
+ * the cached tree is too wide to patch reliably.
+ */
 export function useSetRating() {
   const queryClient = useQueryClient()
   const serverId = useServerId()
   return useCallback(
     async (song: Song, rating: number) => {
-      await setRating(song.id, rating)
-      await queryClient.invalidateQueries({ queryKey: ['server', serverId] })
+      queryClient.setQueriesData({ queryKey: ['server', serverId] }, (old: unknown) =>
+        setRatingInTree(old, song.id, rating)
+      )
+      try {
+        await setRating(song.id, rating)
+      } catch (error) {
+        await queryClient.invalidateQueries({ queryKey: ['server', serverId] })
+        throw error
+      }
     },
     [queryClient, serverId]
   )
+}
+
+/** Rewrites every `userRating` for one song id anywhere in the cached tree. */function setRatingInTree(node: unknown, songId: string, rating: number): unknown {
+  if (Array.isArray(node)) {
+    return node.map((item) => setRatingInTree(item, songId, rating))
+  }
+  if (typeof node !== 'object' || node === null) return node
+
+  const record = node as Record<string, unknown>
+  const next: Record<string, unknown> = {}
+
+  for (const [key, value] of Object.entries(record)) {
+    next[key] =
+      typeof value === 'object' && value !== null ? setRatingInTree(value, songId, rating) : value
+  }
+
+  // Subsonic treats 0 as "no rating", so it is written as absent rather than 0
+  // to keep `song.userRating > 0` checks honest throughout the UI.
+  if ((record as { id?: string }).id === songId) {
+    next['userRating'] = rating > 0 ? rating : undefined
+  }
+
+  return next
 }
 
 /* --------------------------------------------------------------- playback */
@@ -358,3 +432,34 @@ export function useShuffleLibrary(albumIds: string[]) {
 }
 
 export type { Album, Playlist, Song }
+
+/**
+ * Favourite + rating handlers, already wrapped in error toasts.
+ *
+ * `TrackRow` keeps these optional because a caller should only offer an action
+ * it can actually perform. Rather than repeat the same try/catch at all six
+ * call sites, pages take them from here.
+ */
+export function useTrackAnnotations() {
+  const toggleStar = useToggleStar()
+  const rate = useSetRating()
+
+  return {
+    onStar: useCallback(
+      (song: Song) => {
+        void toggleStar(song).catch((error: unknown) => {
+          toast.error((error as Error).message)
+        })
+      },
+      [toggleStar]
+    ),
+    onRate: useCallback(
+      (song: Song, rating: number) => {
+        void rate(song, rating).catch((error: unknown) => {
+          toast.error((error as Error).message)
+        })
+      },
+      [rate]
+    )
+  }
+}

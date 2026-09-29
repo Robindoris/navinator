@@ -4,11 +4,12 @@ import { Library, Play, Shuffle, Disc3 } from 'lucide-react'
 import { getSongsByGenre } from '../../lib/api'
 import { queryKeys, STALE } from '../../lib/query-keys'
 import { useServerId } from '../../store/server'
-import { useGenresQuery, usePlaySongs } from '../shared/hooks'
+import { useGenresQuery, usePlaySongs, useTrackAnnotations } from '../shared/hooks'
 import { PageHeader } from '../shared/Page'
 import { Button, EmptyState, ErrorState, Skeleton } from '../../components/ui/primitives'
 import { CoverArt } from '../../components/items/CoverArt'
 import { TrackRow, TrackHeader } from '../../components/items/TrackRow'
+import { requestAddToPlaylist } from '../../components/items/AddToPlaylistDialog'
 import { usePlayer } from '../../store/player'
 import { formatCount } from '../../lib/utils'
 
@@ -71,6 +72,7 @@ export function GenrePage() {
   const playSongs = usePlaySongs()
   const addToQueue = usePlayer((s) => s.addToQueue)
   const playNext = usePlayer((s) => s.playNextInQueue)
+  const { onStar, onRate } = useTrackAnnotations()
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
   const shuffle = usePlayer((s) => s.shuffle)
 
@@ -146,7 +148,9 @@ export function GenrePage() {
               album={{ name: song.album, coverArt: song.coverArt }}
               onPlay={(target) => playSongs(list, target)}
               onPlayNext={(items) => playNext(items)}
-              onAddToQueue={(items) => addToQueue(items)}
+              onAddToQueue={(items) => addToQueue(items)} onAddToPlaylist={(items) => requestAddToPlaylist(items.map((item) => item.id))}
+              onStar={onStar}
+              onRate={onRate}
             />
           ))}
         </div>

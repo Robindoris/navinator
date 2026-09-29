@@ -1,8 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useNavigate } from '@tanstack/react-router'
 import { Sidebar } from './Sidebar'
 import { TitleBar } from './TitleBar'
 import { PlayerBar } from './PlayerBar'
+import { ShortcutsDialog } from './ShortcutsDialog'
+import { LyricsPanel } from './LyricsPanel'
+import { AddToPlaylistHost } from '../items/AddToPlaylistDialog'
 import { bridge } from '../../lib/bridge'
 import type { MenuAction } from '@shared/types'
 import { usePlayer } from '../../store/player'
@@ -15,6 +18,14 @@ import { Spinner } from '../ui/primitives'
  */
 export function AppShell() {
   const navigate = useNavigate()
+  const [lyricsOpen, setLyricsOpen] = useState(false)
+  const restoreQueue = usePlayer((s) => s.restoreQueue)
+
+  useEffect(() => {
+    // The shell only mounts once a server is connected, so this runs exactly
+    // once per connection and never fires on the connect screen.
+    void restoreQueue()
+  }, [restoreQueue])
 
   useEffect(() => {
     // Menu items are forwarded from the main process as semantic actions so the
@@ -72,8 +83,11 @@ export function AppShell() {
             <Outlet />
           </div>
         </main>
+        {lyricsOpen && <LyricsPanel onClose={() => setLyricsOpen(false)} />}
       </div>
-      <PlayerBar />
+      <PlayerBar lyricsOpen={lyricsOpen} onToggleLyrics={() => setLyricsOpen((open) => !open)} />
+      <ShortcutsDialog />
+      <AddToPlaylistHost />
     </div>
   )
 }

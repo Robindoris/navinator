@@ -11,6 +11,7 @@ import type {
 } from '@shared/types'
 import { config, isEncryptionAvailable } from './config'
 import { installMenu } from './menu'
+import { checkForUpdates, isUpdaterAvailable, onUpdateState, quitAndInstall, wireUpdater } from './updater'
 import { registerMediaProtocol, registerMediaScheme } from './protocol'
 import { connection } from './server'
 import { createMainWindow, getMainWindow } from './window'
@@ -35,7 +36,7 @@ function enqueueWrite<T>(task: () => Promise<T>): Promise<T> {
 
 /* ------------------------------------------------------------------ events */
 
-function sendToRenderer(channel: 'connection:changed' | 'menu:action', payload: unknown): void {
+function sendToRenderer(channel: 'connection:changed' | 'menu:action' | 'update:state', payload: unknown): void {
   const window = getMainWindow()
   if (!window || window.isDestroyed()) return
   window.webContents.send(channel, payload)
@@ -153,6 +154,18 @@ function registerIpcHandlers(): void {
     if (!window) return
     window.setFullScreen(value)
   })
+
+  /* ------------------------------------------------------------- updates */
+
+  handle('app:checkForUpdates', (manual: boolean): void => {
+    checkForUpdates(manual === true)
+  })
+
+  handle('app:installUpdate', (): void => {
+    quitAndInstall()
+  })
+
+  handle('app:updatesAvailable', (): boolean => isUpdaterAvailable())
 }
 
 /* ---------------------------------------------------------------- lifecycle */
@@ -169,6 +182,12 @@ async function bootstrap(): Promise<void> {
   registerIpcHandlers()
   installMenuActions()
   startMinimizedIfConfigured()
+
+  // Mirror every updater transition to the renderer so it can toast progress.
+  onUpdateState((state) => sendToRenderer('update:state', state))
+  wireUpdater()
+  // Not manual, so the user's opt-out in Settings is honoured.
+  checkForUpdates(false)
 
   createMainWindow()
 

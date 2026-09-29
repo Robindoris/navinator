@@ -3,7 +3,7 @@ import type { RepeatMode, Song } from '@shared/types'
 import { AudioEngine } from '../player/engine'
 import { clamp, shuffleArray } from '../lib/utils'
 import { useSettings } from './settings'
-import { scrobble, reportPlayback, savePlayQueue } from '../lib/api'
+import { getPlayQueue, scrobble, reportPlayback, savePlayQueue } from '../lib/api'
 
 /**
  * Rules for when a track counts as "played" for Last.fm/Navidrome.
@@ -35,6 +35,15 @@ interface PlayerState {
   repeat: RepeatMode
   /** Songs the user explicitly started, as opposed to auto-advanced. */
   scrobbled: Set<string>
+  /**
+   * A position to seek to as soon as the deck knows its duration.
+   *
+   * Restoring a saved queue means seeking into a track that has not loaded
+   * yet, and `HTMLMediaElement.currentTime` throws away the assignment while
+   * `duration` is still NaN. The value is parked here and applied by the first
+   * `progress` event that has a real duration.
+   */
+  pendingSeek: number | null
 
   /* actions */
   playQueue: (songs: Song[], startIndex?: number) => void
@@ -53,6 +62,7 @@ interface PlayerState {
   removeAt: (index: number) => void
   moveInQueue: (from: number, to: number) => void
   clearQueue: () => void
+  restoreQueue: () => Promise<void>
   addToQueue: (songs: Song[], playNext?: boolean) => void
   playNextInQueue: (songs: Song[]) => void
   stop: () => void
@@ -96,11 +106,19 @@ export const usePlayer = create<PlayerState>((set, get) => {
   engine.on('progress', (currentTime, duration, buffered) => {
     set({ position: currentTime, duration, buffered })
 
+    const pendingSeek = get().pendingSeek
+    if (pendingSeek !== null && duration > 0) {
+      engine.seek(pendingSeek)
+      set({ pendingSeek: null })
+      return
+    }
+
     const { scrobbled } = get()
     const song = get().queue[get().index]
     if (!song) return
 
-    if (qualifiesForScrobble(currentTime, duration, scrobbled.has(song.id))) {
+    // Stations are not scannable, and a live stream has no meaningful duration.
+    if (!song.isRadio && qualifiesForScrobble(currentTime, duration, scrobbled.has(song.id))) {
       set({ scrobbled: new Set(scrobbled).add(song.id) })
       const audio = useSettings.getState().settings.audio
       if (audio.scrobble) safely('scrobble', () => scrobble(song.id, true))
@@ -142,14 +160,15 @@ export const usePlayer = create<PlayerState>((set, get) => {
   function reportCurrentPlayback(state: PlaybackReportState['state']): void {
     if (!useSettings.getState().settings.audio.playbackReport) return
     const song = currentSong()
-    if (!song) return
+    // A station has no server-side media id, so there is nothing to report.
+    if (!song || song.isRadio) return
     const positionMs = Math.round(get().position * 1000)
     safely('reportPlayback', () => reportPlayback({ mediaId: song.id, state, positionMs, playbackRate: 1 }))
   }
 
   function finishCurrentPlayback(state: 'stopped'): void {
     const song = currentSong()
-    if (!song) return
+    if (!song || song.isRadio) return
     const positionMs = Math.round(get().position * 1000)
     if (!useSettings.getState().settings.audio.playbackReport) return
     safely('reportPlayback:stop', () => reportPlayback({ mediaId: song.id, state, positionMs }))
@@ -171,8 +190,13 @@ export const usePlayer = create<PlayerState>((set, get) => {
     if (queue.length === 0) return
     // Saving the shuffled order would permanently reshuffle the server-side
     // queue, so only the canonical order is written back.
-    const ids = shuffle ? get().original.map((s) => s.id) : queue.map((s) => s.id)
-    safely('savePlayQueue', () => savePlayQueue(ids, queue[index]?.id, Math.round(position * 1000)))
+    const ids = (shuffle ? get().original : queue)
+      .filter((song) => !song.isRadio)
+      .map((song) => song.id)
+    // A station is not a track, so it cannot be the server queue's `current`
+    // either; falling back to the first real track keeps the position sane.
+    const current = queue[index]?.isRadio ? ids[0] : queue[index]?.id
+    safely('savePlayQueue', () => savePlayQueue(ids, current, Math.round(position * 1000)))
   }
 
   function advance(): void {
@@ -220,6 +244,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     shuffle: false,
     repeat: 'off',
     scrobbled: new Set(),
+    pendingSeek: null,
 
     /** Replaces the queue and starts playing at `startIndex`. */
     playQueue: (songs, startIndex = 0) => {
@@ -356,6 +381,42 @@ export const usePlayer = create<PlayerState>((set, get) => {
         buffered: 0
       })
       safely('savePlayQueue', () => savePlayQueue([]))
+    },
+
+    /**
+     * Rebuilds the queue the server last saved, so closing and reopening the
+     * app does not throw away what you were listening to.
+     *
+     * Restores *paused*. Auto-resuming on launch would mean audio starting
+     * without being asked for, and the gapless deck has no notion of a
+     * "resume from N seconds" anyway — the position is applied as soon as the
+     * track reports a duration (see `pendingSeek`).
+     *
+     * A no-op when the queue is already populated, so switching servers does
+     * not clobber a session that is mid-flight.
+     */
+    restoreQueue: async () => {
+      if (get().queue.length > 0) return
+      let saved: Awaited<ReturnType<typeof getPlayQueue>>
+      try {
+        saved = await getPlayQueue()
+      } catch {
+        return
+      }
+      const songs = (saved?.entry ?? []).filter((song) => song && song.id)
+      if (songs.length === 0) return
+
+      const currentId = saved?.current
+      const index = currentId ? Math.max(0, songs.findIndex((song) => song.id === currentId)) : 0
+      const positionMs = typeof saved?.position === 'number' ? saved.position : 0
+
+      set({
+        queue: songs,
+        original: songs,
+        index,
+        pendingSeek: positionMs > 0 ? positionMs / 1000 : null
+      })
+      engine.setQueue(songs, index, false)
     },
 
     addToQueue: (songs, playNext = false) => {

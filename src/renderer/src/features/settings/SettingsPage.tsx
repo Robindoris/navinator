@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Server,
   Sliders,
@@ -11,9 +11,12 @@ import {
   Radio as RadioIcon
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { SHORTCUTS } from '@shared/shortcuts'
 import { useSettings } from '../../store/settings'
 import { useServer } from '../../store/server'
 import { usePlayer } from '../../store/player'
+import { useUpdates } from '../../store/updates'
+import { bridge } from '../../lib/bridge'
 import { PageHeader } from '../shared/Page'
 import { Button, Field, Select, Badge } from '../../components/ui/primitives'
 import { Segmented, Slider, Switch } from '../../components/ui/overlays'
@@ -40,25 +43,22 @@ const FORMATS: { value: StreamFormat; label: string }[] = [
   { value: 'aac', label: 'AAC' }
 ]
 
-const SHORTCUTS: [string, string][] = [
-  ['Space', 'Play / pause'],
-  ['→', 'Next track'],
-  ['←', 'Previous track (or restart)'],
-  ['↑ / ↓', 'Volume up / down'],
-  ['M', 'Mute'],
-  ['S', 'Toggle shuffle'],
-  ['R', 'Cycle repeat mode'],
-  ['/', 'Jump to search'],
-  ['Esc', 'Clear search'],
-  ['⌘/Ctrl + ,', 'Settings']
-]
-
 export function SettingsPage() {
   const { settings, patch, reset } = useSettings()
+  const updateState = useUpdates((s) => s.state)
+  const checkForUpdates = useUpdates((s) => s.check)
+  const [version, setVersion] = useState<string | null>(null)
   const audio = settings.audio
   const { connection, profiles, disconnect, remove } = useServer()
   const clearQueue = usePlayer((s) => s.clearQueue)
   const [resetting, setResetting] = useState(false)
+
+  useEffect(() => {
+    void bridge.app
+      .info()
+      .then((info) => setVersion(info.version))
+      .catch(() => undefined)
+  }, [])
 
   const profile = connection.profile
 
@@ -247,6 +247,30 @@ export function SettingsPage() {
               checked={settings.startMinimized}
               onChange={(value) => patch({ startMinimized: value })}
             />
+            <ToggleRow
+              label="Install updates automatically"
+              description="Check for a new Navinator on launch. Updates download in the background and are never installed without your say-so."
+              checked={settings.autoUpdate}
+              onChange={(value) => patch({ autoUpdate: value })}
+            />
+            <div className="flex items-center justify-between gap-4 pt-1">
+              <p className="text-xs text-faint">
+                {updateState.kind === 'downloading'
+                  ? `Downloading… ${updateState.percent}%`
+                  : updateState.kind === 'checking'
+                    ? 'Checking…'
+                    : updateState.kind === 'up-to-date'
+                      ? `Navinator ${version ?? ''} is up to date.`
+                      : 'Manual check contacts the release feed.'}
+              </p>
+              <Button
+                variant="ghost"
+                onClick={checkForUpdates}
+                disabled={updateState.kind === 'checking' || updateState.kind === 'downloading'}
+              >
+                Check now
+              </Button>
+            </div>
           </div>
         </div>
       </Section>
@@ -271,11 +295,18 @@ export function SettingsPage() {
 
       {/* Shortcuts */}
       <Section icon={Keyboard} title="Keyboard shortcuts">
+        <p className="mb-3 text-xs text-muted">
+          Press <kbd className="rounded border border-line bg-surface-2 px-1 py-0.5 font-mono">?</kbd>{' '}
+          anywhere in the app for this list.
+        </p>
         <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-          {SHORTCUTS.map(([keys, description]) => (
-            <div key={keys} className="flex items-baseline justify-between gap-4 border-b border-line py-1.5">
-              <dt className="text-sm text-muted">{description}</dt>
-              <dd className="shrink-0 font-mono text-xs text-fg">{keys}</dd>
+          {SHORTCUTS.map((shortcut) => (
+            <div
+              key={`${shortcut.group}-${shortcut.keys}-${shortcut.label}`}
+              className="flex items-baseline justify-between gap-4 border-b border-line py-1.5"
+            >
+              <dt className="text-sm text-muted">{shortcut.label}</dt>
+              <dd className="shrink-0 font-mono text-xs text-fg">{shortcut.keys}</dd>
             </div>
           ))}
         </dl>

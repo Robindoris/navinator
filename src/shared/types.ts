@@ -95,6 +95,8 @@ export interface AppSettings {
   compactAlbumGrid: boolean
   confirmOnQuit: boolean
   startMinimized: boolean
+  /** Check for application updates automatically on launch. */
+  autoUpdate: boolean
   audio: AudioSettings
 }
 
@@ -138,6 +140,18 @@ export interface Song {
   /** Navidrome/OpenSubsonic lyrics, present when the `songLyrics` extension is on. */
   lyrics?: string
   bookmarkPosition?: number
+  /**
+   * Internet radio.
+   *
+   * A station is not a library track — it has no Subsonic song id, no duration
+   * and no scrobble target — but it has to be queueable, so it is carried in the
+   * same shape. The player and the queue check `isRadio` and skip every
+   * annotation the server cannot accept.
+   */
+  isRadio?: boolean
+  /** The station's own id, used to resolve the stream through the media proxy. */
+  streamUrl?: string
+  homePageUrl?: string
 }
 
 export interface Album {
@@ -298,6 +312,18 @@ export interface SearchResults {
   playlist?: Playlist[]
 }
 
+/* --------------------------------------------------------------- updates */
+
+/** Mirrors the main-process updater status into the renderer. */
+export type UpdateState =
+  | { kind: 'idle' }
+  | { kind: 'checking' }
+  | { kind: 'available'; version: string }
+  | { kind: 'downloading'; percent: number }
+  | { kind: 'downloaded'; version: string }
+  | { kind: 'up-to-date' }
+  | { kind: 'error'; message: string }
+
 /* ---------------------------------------------------------------------- misc */
 
 export type MenuAction =
@@ -321,6 +347,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   compactAlbumGrid: false,
   confirmOnQuit: false,
   startMinimized: false,
+  autoUpdate: true,
   audio: {
     transcode: true,
     maxBitRate: 0,

@@ -100,7 +100,7 @@ Everything below is wired to actual UI in the current tree.
 
 **Browsing**
 - Home with *Recently added*, *On repeat* (most played), and a one-click *Shuffle recently added*
-- Albums, sortable 8 ways: newest, name, artist, year, most played, recently played, top rated, random
+- Albums, sortable 8 ways: newest, name, artist, year, most played, recently played, top rated, random — **paged 100 at a time**, loading more as you scroll
 - Artists, alphabetised with a client-side filter; artist pages resolve the full discography
 - Genres, with per-genre play / shuffle / queue
 - Search across artists, albums, songs and playlists (`search3`, debounced 250 ms, fires at ≥ 2 characters)
@@ -116,20 +116,29 @@ Everything below is wired to actual UI in the current tree.
 - Two-deck gapless, with optional 0–8000 ms crossfade
 - Shuffle, and a three-state repeat (`off → all → one`)
 - Editable, **drag-to-reorder** queue, persisted to the server roughly every 15 seconds
+- **Your queue comes back** on launch, resumed at the position you left it
 - Scrobbling at half the track or four minutes, whichever comes first
 - OpenSubsonic `playbackReport` heartbeats every 20 seconds while playing
 - Selective transcoding with a bitrate ceiling and format preference
+- **Synced lyrics**, including word-level highlighting and click-to-seek, in a side panel
+- **1–5 star ratings**, optimistic on every track list
+- **Internet radio plays in-app** and queues like anything else
 - Full OS media-key integration — hardware play/pause/next/prev/seek, with artwork and a working OS scrubber
 
 **Playlists**
-- Create, rename and delete
+- Create (with description and public flag), rename, edit and delete
+- **Add to playlist** from any track list, or create one pre-seeded on the spot
+- **Drag to reorder** the tracklist
 - Per-track download of the original file
-- Per-track removal, and starring
+- Per-track removal, starring and rating
 
 **Interface**
 - 8 colour palettes (Violet, Ocean, Emerald, Amber, Rose, Nord, Citrus, Graphite), each with a light and a dark variant
 - Dark / Light / System, following `prefers-color-scheme` live with no flash of the wrong palette
+- Compact album grid, a settings toggle that actually changes the grid
+- Press `?` anywhere for the full keyboard reference
 - Collapsible sidebar, collapsible native title bar, code-split routes
+- **Automatic updates**, opt-out in Settings, downloaded but never installed without asking
 
 ### Keyboard
 
@@ -140,6 +149,7 @@ Everything below is wired to actual UI in the current tree.
 | `←` | Previous / restart | `R` | Cycle repeat mode |
 | `↑` `↓` | Volume | `/` | Jump to search |
 | `Esc` | Clear search | `⌘/Ctrl` `,` | Settings |
+| `?` | Shortcut reference | `⌘/Ctrl` `⇧` `→` `←` | Seek ±10s |
 
 Shortcuts stand down whenever a text field has focus or ⌘/Ctrl is held, so OS chords keep working.
 
@@ -174,7 +184,7 @@ The window opens on a connect screen. Paste a server address — `music.example.
 
 - `electron-builder.yml` excludes `resources/` from the packaged files — it is build input only, and nothing loads from it at runtime.
 - macOS builds use a hardened runtime with `resources/entitlements.mac.plist`. Because the app is unsigned locally, macOS will still need the usual right-click → Open on first launch.
-- The GitHub `publish:` target is configured for `Robindoris/navinator`, so `npm run dist` can publish releases — but nothing consumes it yet, because there is no update check wired up (see [Known gaps](#known-gaps)).
+- The GitHub `publish:` target is configured for `Robindoris/navinator`. `npm run dist` publishes a release there, and the built-in updater reads that feed — so a version bump plus a publish is all an update takes.
 - `appId` is still `dev.navinator.app`. Change it to your own reverse-DNS identifier before a public release; it is baked into installs and cannot be changed later without breaking upgrades.
 - Linux `desktop` entries in electron-builder 26 accept only `desktopActions` and `entry`.
 
@@ -192,6 +202,7 @@ src/
 │   ├── protocol.ts         the navinator:// handler — app assets and media proxy
 │   ├── config.ts           navinator.json, safeStorage, atomic writes
 │   ├── window.ts           BrowserWindow, CSP, navigation lockdown
+│   ├── updater.ts          electron-updater wrapper; pushes state to the renderer
 │   └── menu.ts             native menu and its accelerators
 │
 ├── preload/index.ts     54 lines. The entire privileged surface.
@@ -201,11 +212,12 @@ src/
 │   ├── media.ts            scheme, URL builders, decode allow-list
 │   ├── ipc.ts              the IPC contract
 │   ├── types.ts            domain types and default settings
+│   ├── shortcuts.ts        every keybinding, listed once
 │   └── themes.ts           palette metadata
 │
 └── renderer/           No Node access whatsoever.
     ├── src/player/         two-deck engine, shortcuts, OS media session
-    ├── src/store/          zustand: server, settings, player
+    ├── src/store/          zustand: server, settings, player, updates
     ├── src/features/       one directory per route
     └── src/components/     layout, items, ui primitives
 ```
@@ -226,17 +238,15 @@ A few decisions worth knowing before you change things:
 
 ## Known gaps
 
-Being explicit, because a README that only lists what works is a marketing page:
+Still worth being explicit about:
 
-- **Not signed or notarised.** First launch on macOS requires right-click → Open. There is no auto-update — `electron-updater` is a devDependency that nothing imports yet.
-- **Lyrics are plumbed but not rendered.** `getLyricsBySongId` with word-level timings is wrapped and cached, and no component calls it yet.
-- **Playlists cannot be reordered or added to.** `changePlaylistOrder` and `updatePlaylist`'s `songIndexesToAdd` are allow-listed, but there's no drag handle on playlist rows and no "add to playlist" menu item.
-- **No user-set ratings.** `setRating` and a star component both exist; no page mounts them. Ratings you see are read-only and come from the server.
-- **Radio is browse-only.** Stations are listed and link out; they are not queueable, because a stream URL is not a Subsonic song id.
-- **`?` opens nothing.** It dispatches a `navinator:show-shortcuts` event that has no listener yet. The reference is in Settings.
-- **The compact album grid toggle persists but changes nothing** — the grid hardcodes its column count.
-- **Queues are written, never restored.** `getPlayQueue` is wrapped but not called, so a saved queue does not come back on launch.
-- **Pagination is capped at 200 albums per list** and search results at 20/20/40/10.
+- **Not signed or notarised.** First launch on macOS requires right-click → Open. Auto-update is wired up, but it has nothing to fetch until a release is published under the `Robindoris/navinator` GitHub releases feed.
+- **No tests.** There is no test runner in the project. The invariants that mattered most — the write ordering, the endpoint allow-list, the decode table — are enforced by types and comments rather than assertions, which is weaker than it should be.
+- **The media proxy has no offline behaviour.** With no connection, every `navinator://` request returns 503 rather than a placeholder, so artwork blanks out while a server is unreachable.
+- **Genre views are still capped at 500 songs.** Album lists and search are paged, but `getSongsByGenre` is a single call with a fixed count.
+- **The queue does not survive a server switch.** A restored queue is tied to one server; switching servers clears it, because the track ids mean nothing on the new one.
+- **Radio is queued but not scannable**, so a station never advances Navidrome's play counts or feeds the "now playing" view. The stream URL is also opaque to Navidrome, so track-level quality settings do not apply to it.
+- **The transcript of a restored queue position is approximate** for transcoded streams, because a chunked transcode cannot seek precisely.
 
 ---
 

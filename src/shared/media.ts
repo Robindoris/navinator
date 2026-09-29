@@ -19,7 +19,7 @@ export const NAVIGATOR_SCHEME = 'navinator'
 /** Host segment distinguishes the `media` namespace from future schemes. */
 export const MEDIA_HOST = 'media'
 
-export type MediaKind = 'song' | 'cover' | 'avatar' | 'download'
+export type MediaKind = 'song' | 'cover' | 'avatar' | 'download' | 'radio'
 
 export interface SongUrlOptions {
   transcode?: boolean
@@ -107,6 +107,17 @@ export function songMediaUrl(id: string, options: SongUrlOptions = {}): string {
 /** Raw-file download URL. */
 export function downloadMediaUrl(id: string): string {
   return mediaUrl('download', { id })
+}
+
+/**
+ * Internet radio stream.
+ *
+ * A station has no Subsonic id, so the main process resolves the real URL from
+ * the server's own station list rather than trusting one from the page — see
+ * `protocol.ts`. The id here is the station's id, not a track id.
+ */
+export function radioMediaUrl(stationId: string): string {
+  return mediaUrl('radio', { id: stationId })
 }
 
 /** Cover art URL. Ids are content addressed, so responses are cacheable. */

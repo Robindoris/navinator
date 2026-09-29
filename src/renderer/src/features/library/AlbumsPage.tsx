@@ -1,8 +1,8 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Disc3, Shuffle, Search as SearchIcon } from 'lucide-react'
 import type { AlbumListType } from '../../lib/api'
-import { useAlbumListQuery, useLibraryNavigation, usePlayAlbum, useShuffleLibrary } from '../shared/hooks'
+import { useAlbumListPages, useLibraryNavigation, usePlayAlbum, useShuffleLibrary } from '../shared/hooks'
 import { AlbumGrid, PageHeader } from '../shared/Page'
 import { Button, ErrorState, Input } from '../../components/ui/primitives'
 import { Segmented } from '../../components/ui/overlays'
@@ -31,13 +31,31 @@ export function AlbumsPage() {
 
   const [filter, setFilter] = useState('')
 
-  const query = useAlbumListQuery(view as AlbumListType)
-  const shufflePool = useShuffleLibrary((query.data ?? []).map((item) => item.id))
+  const query = useAlbumListPages(view as AlbumListType)
+  const shufflePool = useShuffleLibrary(query.albums.map((item) => item.id))
+  const sentinel = useRef<HTMLDivElement>(null)
 
-  // Album lists come back unpaginated and can be large, so filtering is done
-  // client side rather than issuing a request per keystroke.
+  // Pull the next page when the bottom of the list comes into view. The button
+  // stays as a fallback for anyone who never quite reaches the end.
+  useEffect(() => {
+    const node = sentinel.current
+    if (!node) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return
+        if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage()
+      },
+      { rootMargin: '600px' }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [query.hasNextPage, query.isFetchingNextPage, query.fetchNextPage])
+
+  // Filtering is client side: the loaded pages are already in memory, and a
+  // request per keystroke against `search3` would be both slower and worse for
+  // the server than matching locally over what has been fetched.
   const albums = useMemo(() => {
-    const all = query.data ?? []
+    const all = query.albums
     if (!filter.trim()) return all
     const needle = filter.trim().toLowerCase()
     return all.filter(
@@ -46,13 +64,17 @@ export function AlbumsPage() {
         item.artist?.toLowerCase().includes(needle) ||
         String(item.year ?? '').includes(needle)
     )
-  }, [query.data, filter])
+  }, [query.albums, filter])
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Albums"
-        subtitle={query.data ? `${query.data.length} in your library` : 'Loading your library…'}
+        subtitle={
+          query.albums.length
+            ? `${query.albums.length}${query.hasNextPage ? '+' : ''} in your library`
+            : 'Loading your library…'
+        }
         actions={
           <>
             <Button
@@ -61,7 +83,7 @@ export function AlbumsPage() {
                 if (!shuffle) toggleShuffle()
                 void shufflePool()
               }}
-              disabled={!query.data?.length}
+              disabled={query.albums.length === 0}
             >
               <Shuffle className="size-4" />
               Shuffle all
@@ -100,10 +122,25 @@ export function AlbumsPage() {
       )}
 
       {!query.isLoading && albums.length > 0 && (
-        <p className="flex items-center gap-1.5 text-xs text-faint">
-          <Disc3 className="size-3.5" />
-          Double-click an album to play it straight through.
-        </p>
+        <div
+          ref={sentinel}
+          className="flex flex-col items-center gap-3"
+        >
+          {query.hasNextPage && (
+            <Button
+              variant="secondary"
+              onClick={() => void query.fetchNextPage()}
+              disabled={query.isFetchingNextPage}
+              loading={query.isFetchingNextPage}
+            >
+              Load more
+            </Button>
+          )}
+          <p className="flex items-center gap-1.5 text-xs text-faint">
+            <Disc3 className="size-3.5" />
+            Double-click an album to play it straight through.
+          </p>
+        </div>
       )}
     </div>
   )

@@ -164,6 +164,35 @@ export function DropdownMenuLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
+/* ------------------------------------------------------------ submenu */
+
+export const DropdownMenuSub = DropdownPrimitive.Sub
+export const DropdownMenuSubTrigger = DropdownPrimitive.SubTrigger
+
+export function DropdownMenuSubContent({
+  children,
+  className
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <DropdownPrimitive.Portal>
+      <DropdownPrimitive.SubContent
+        sideOffset={4}
+        collisionPadding={8}
+        className={cn(
+          'z-50 min-w-32 overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-[var(--nav-shadow-lg)]',
+          'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
+          className
+        )}
+      >
+        {children}
+      </DropdownPrimitive.SubContent>
+    </DropdownPrimitive.Portal>
+  )
+}
+
 /* ------------------------------------------------------------------ slider */
 
 export const Slider = forwardRef<

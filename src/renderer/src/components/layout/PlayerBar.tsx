@@ -11,7 +11,8 @@ import {
   Volume2,
   VolumeX,
   ListMusic,
-  Loader2
+  Loader2,
+  Type
 } from 'lucide-react'
 import { formatDuration } from '../../lib/utils'
 import { usePlayer } from '../../store/player'
@@ -21,7 +22,7 @@ import { CoverArt } from '../items/CoverArt'
 
 const VOLUME_STEPS = 20
 
-export function PlayerBar() {
+export function PlayerBar({ lyricsOpen, onToggleLyrics }: { lyricsOpen: boolean; onToggleLyrics: () => void }) {
   const navigate = useNavigate()
   const song = usePlayer((s) => s.queue[s.index] ?? null)
   const playing = usePlayer((s) => s.playing)
@@ -223,6 +224,17 @@ export function PlayerBar() {
             onValueChange={(value) => setVolume(value[0])}
           />
         </div>
+        <Tooltip label={lyricsOpen ? 'Hide lyrics' : 'Show lyrics'}>
+          <IconButton
+            label={lyricsOpen ? 'Hide lyrics' : 'Show lyrics'}
+            size="icon-sm"
+            variant="ghost"
+            active={lyricsOpen}
+            onClick={onToggleLyrics}
+          >
+            <Type className="size-4" />
+          </IconButton>
+        </Tooltip>
         <IconButton
           label="Show queue"
           size="icon-sm"

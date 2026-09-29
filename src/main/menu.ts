@@ -1,5 +1,6 @@
 import { app, Menu, shell, type MenuItemConstructorOptions } from 'electron'
 import type { MenuAction } from '@shared/types'
+import { checkForUpdates, isUpdaterAvailable } from './updater'
 
 type ActionSender = (action: MenuAction) => void
 
@@ -68,10 +69,12 @@ export function buildMenu(onAction: ActionSender): Menu {
         { type: 'separator' },
         action('Previous', 'previous', 'CmdOrCtrl+Left'),
         action('Next', 'next', 'CmdOrCtrl+Right'),
-        action('Restart Track', 'previous', 'CmdOrCtrl+Shift+Left'),
         { type: 'separator' },
-        action('Seek Forward', 'seek-forward', 'CmdOrCtrl+Right'),
-        action('Seek Backward', 'seek-backward', 'CmdOrCtrl+Left'),
+        // Seeking uses Shift. Without it these collided with Previous/Next, and
+        // because Electron resolves a duplicate accelerator to the first match,
+        // the seek items were silently unreachable.
+        action('Seek Forward', 'seek-forward', 'CmdOrCtrl+Shift+Right'),
+        action('Seek Backward', 'seek-backward', 'CmdOrCtrl+Shift+Left'),
         { type: 'separator' },
         action('Volume Up', 'volume-up', 'CmdOrCtrl+Up'),
         action('Volume Down', 'volume-down', 'CmdOrCtrl+Down'),
@@ -100,6 +103,14 @@ export function buildMenu(onAction: ActionSender): Menu {
     {
       label: 'Help',
       submenu: [
+        {
+          label: 'Check for Updates…',
+          // electron-updater has no feed to read in an unpackaged build, so the
+          // item is hidden rather than present-and-broken.
+          visible: isUpdaterAvailable(),
+          click: () => checkForUpdates(true)
+        },
+        { type: 'separator' },
         {
           label: 'Navidrome Documentation',
           click: () => void shell.openExternal('https://www.navidrome.org/docs/')

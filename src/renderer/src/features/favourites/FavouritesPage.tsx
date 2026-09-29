@@ -1,10 +1,17 @@
 import { Heart, Play, Shuffle } from 'lucide-react'
 import { toast } from 'sonner'
-import { useLibraryNavigation, usePlayArtist, usePlaySongs, useStarredQuery } from '../shared/hooks'
+import {
+  useLibraryNavigation,
+  usePlayArtist,
+  usePlaySongs,
+  useStarredQuery,
+  useTrackAnnotations
+} from '../shared/hooks'
 import { PageHeader, Section, AlbumGrid } from '../shared/Page'
 import { Button, EmptyState, ErrorState, Skeleton } from '../../components/ui/primitives'
 import { ArtistCard } from '../../components/items/Cards'
 import { TrackRow, TrackHeader } from '../../components/items/TrackRow'
+import { requestAddToPlaylist } from '../../components/items/AddToPlaylistDialog'
 import { usePlayer } from '../../store/player'
 import { formatCount } from '../../lib/utils'
 
@@ -15,6 +22,7 @@ export function FavouritesPage() {
   const playArtist = usePlayArtist()
   const addToQueue = usePlayer((s) => s.addToQueue)
   const playNext = usePlayer((s) => s.playNextInQueue)
+  const { onStar, onRate } = useTrackAnnotations()
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
   const shuffle = usePlayer((s) => s.shuffle)
 
@@ -134,7 +142,9 @@ export function FavouritesPage() {
                 onGoToAlbum={() => song.albumId && album(song.albumId)}
                 onGoToArtist={() => song.artistId && artist(song.artistId)}
                 onPlayNext={(items) => playNext(items)}
-                onAddToQueue={(items) => addToQueue(items)}
+                onAddToQueue={(items) => addToQueue(items)} onAddToPlaylist={(items) => requestAddToPlaylist(items.map((item) => item.id))}
+                onStar={onStar}
+                onRate={onRate}
               />
             ))}
           </div>

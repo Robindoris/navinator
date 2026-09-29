@@ -256,6 +256,7 @@ class Connection {
       return this.publish(info)
     } catch (error) {
       this.current = null
+      this.invalidateStationCache()
       if (isUnauthorised(error)) {
         return this.failed(profile, new Error('Incorrect username or password'))
       }
@@ -265,6 +266,7 @@ class Connection {
 
   async disconnect(): Promise<void> {
     this.current = null
+    this.invalidateStationCache()
     this.publish(DISCONNECTED)
   }
 
@@ -403,6 +405,66 @@ class Connection {
       method: 'getAvatar',
       params: { username, ...(size ? { size } : {}) }
     })
+  }
+
+  /* --------------------------------------------------------- radio streams */
+
+  /**
+   * Cached list of the server's radio stations, as id → stream URL.
+   *
+   * Short-lived on purpose: Navidrome's admin UI can add or edit stations, and a
+   * stale cache should not make a new station unplayable for long.
+   */
+  private stationCache: { at: number; byId: Map<string, string> } | null = null
+
+  private static readonly STATION_TTL = 60_000
+
+  /**
+   * Resolves a station id to its stream URL, using the server's own list.
+   *
+   * The renderer must never be able to name an arbitrary URL here. The media
+   * proxy is reachable from the page, so accepting a renderer-supplied
+   * `streamUrl` would turn it into an open proxy — reachable to anything the
+   * renderer can reach, including internal hosts. Looking the id up server-side
+   * makes the set of streamable URLs exactly the set Navidrome already exposes.
+   */
+  async resolveStationUrl(id: string): Promise<string> {
+    const active = this.current
+    if (!active) throw new Error('Not connected to a server')
+
+    const now = Date.now()
+    let cache = this.stationCache
+    if (!cache || now - cache.at > Connection.STATION_TTL) {
+      const response = await active.api.getInternetRadioStations()
+      if (response.status === 'failed') {
+        throw new Error(response.error.message ?? 'The server rejected the station lookup')
+      }
+      const byId = new Map<string, string>()
+      for (const station of response.internetRadioStations?.internetRadioStation ?? []) {
+        if (station.id && station.streamUrl) byId.set(station.id, station.streamUrl)
+      }
+      cache = { at: now, byId }
+      this.stationCache = cache
+    }
+
+    const url = cache.byId.get(id)
+    if (!url) throw new Error('That station is no longer on the server')
+
+    let parsed: URL
+    try {
+      parsed = new URL(url)
+    } catch {
+      throw new Error('That station has an unusable stream URL')
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('Only http and https radio streams are supported')
+    }
+    return url
+  }
+
+  /** Drops the station cache when the connection changes underneath us. */
+  invalidateStationCache(): void {
+    this.stationCache = null
   }
 
   /* --------------------------------------------------------------- helpers */

@@ -108,12 +108,47 @@ export const getSong = (id: string) => call<{ song: Song }>('getSong', [{ id }])
 
 /* -------------------------------------------------------------- searching */
 
+/**
+ * Page sizes for each `search3` result type.
+ *
+ * The first page is deliberately modest — search is a filtering UI, not a
+ * browser, and a 3,000-row response for a two-character query is hostile to
+ * both the server and the renderer. Paging on demand goes from there.
+ */
+export const SEARCH_PAGE = { artist: 20, album: 20, song: 40, playlist: 10 } as const
+
+export interface SearchOffsets {
+  artist: number
+  album: number
+  song: number
+  playlist: number
+}
+
+export const NO_SEARCH_OFFSETS: SearchOffsets = { artist: 0, album: 0, song: 0, playlist: 0 }
+
+/**
+ * Searches the library.
+ *
+ * `search3` counts *and* offsets are per result type, so every section is
+ * paged independently. A short section is the end-of-list signal.
+ */
 export const search = (
   query: string,
-  counts = { artist: 20, album: 20, song: 40, playlist: 10 }
+  counts: { artist: number; album: number; song: number; playlist: number } = { ...SEARCH_PAGE },
+  offsets: SearchOffsets = NO_SEARCH_OFFSETS
 ): Promise<SearchResults> =>
   call<{ searchResult3: SearchResults }>('search3', [
-    { query, artistCount: counts.artist, albumCount: counts.album, songCount: counts.song, playlistCount: counts.playlist }
+    {
+      query,
+      artistCount: counts.artist,
+      albumCount: counts.album,
+      songCount: counts.song,
+      playlistCount: counts.playlist,
+      artistOffset: offsets.artist,
+      albumOffset: offsets.album,
+      songOffset: offsets.song,
+      playlistOffset: offsets.playlist
+    }
   ]).then((r) => r.searchResult3 ?? {})
 
 /* -------------------------------------------------------------- playlists */
@@ -124,7 +159,7 @@ export const getPlaylists = () =>
 export const getPlaylist = (id: string) =>
   call<{ playlist: Playlist & { entry: Song[] } }>('getPlaylist', [{ id }]).then((r) => r.playlist)
 
-export const createPlaylist = (input: { name: string; songIds?: string[] }) =>
+export const createPlaylist = (input: { name: string; comment?: string; public?: boolean; songIds?: string[] }) =>
   call<{ playlist: Playlist }>('createPlaylist', [input]).then((r) => r.playlist)
 
 export const updatePlaylist = (input: {
@@ -137,6 +172,16 @@ export const updatePlaylist = (input: {
 }) => call<{ playlist: Playlist }>('updatePlaylist', [input]).then((r) => r.playlist)
 
 export const deletePlaylist = (id: string) => call('deletePlaylist', [{ id }])
+
+/**
+ * Reorders a playlist.
+ *
+ * Subsonic takes the *whole* new id order, not a move instruction, and every
+ * call is a full rewrite of the playlist — so the client sends the complete
+ * list it already has in memory rather than trying to describe the delta.
+ */
+export const changePlaylistOrder = (playlistId: string, songIds: string[]) =>
+  call<{ playlist: Playlist }>('changePlaylistOrder', [{ playlistId, songIds }]).then((r) => r.playlist)
 
 /* ------------------------------------------------------------- annotation */
 
@@ -164,9 +209,21 @@ export const reportPlayback = (input: {
 
 /* ----------------------------------------------------------------- lyrics */
 
-export interface StructuredLine {
+export interface StructuredWord {
+  /** Milliseconds from the start of the track. */
   start?: number
   value: string
+}
+
+export interface StructuredLine {
+  /** Milliseconds from the start of the track. */
+  start?: number
+  value: string
+  /**
+   * Word-level timings. Only present when the `songLyrics` extension answered
+   * an `enhanced` request; plain servers send `line` alone.
+   */
+  word?: StructuredWord[]
 }
 
 export interface StructuredLyric {

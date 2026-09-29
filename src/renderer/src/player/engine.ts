@@ -1,4 +1,4 @@
-import { songMediaUrl, resolveStreamOptions } from '@shared/media'
+import { radioMediaUrl, songMediaUrl, resolveStreamOptions } from '@shared/media'
 import type { AudioSettings, Song } from '@shared/types'
 
 /**
@@ -97,6 +97,9 @@ export class AudioEngine {
   }
 
   private urlFor(song: Song): string {
+    // A station is proxied by its own id, so none of the transcode options
+    // apply — the server has already decided the codec.
+    if (song.isRadio) return radioMediaUrl(song.id)
     const options = resolveStreamOptions(song, this.settings)
     return songMediaUrl(song.id, { ...options, jukebox: this.settings.jukebox })
   }

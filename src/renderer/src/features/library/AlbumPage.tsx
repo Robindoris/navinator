@@ -1,15 +1,15 @@
 import { useParams } from '@tanstack/react-router'
 import { Play, Shuffle, Heart, Plus, Clock, Music2 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Song } from '@shared/types'
 import {
   useAlbumQuery,
   useLibraryNavigation,
   usePlaySongs,
-  useToggleStar
+  useTrackAnnotations
 } from '../shared/hooks'
-import { Button, EmptyState, ErrorState, Skeleton, Badge, IconButton } from '../../components/ui/primitives'
+import { Button, EmptyState, ErrorState, Skeleton, Badge, IconButton, Rating } from '../../components/ui/primitives'
 import { TrackRow, TrackHeader } from '../../components/items/TrackRow'
+import { requestAddToPlaylist } from '../../components/items/AddToPlaylistDialog'
 import { CoverArt } from '../../components/items/CoverArt'
 import { usePlayer } from '../../store/player'
 import { formatCount, formatTotalDuration, groupByDisc } from '../../lib/utils'
@@ -18,7 +18,7 @@ export function AlbumPage() {
   const { albumId } = useParams({ from: '/album/$albumId' })
   const { artist } = useLibraryNavigation()
   const playSongs = usePlaySongs()
-  const toggleStar = useToggleStar()
+  const { onStar, onRate } = useTrackAnnotations()
   const addToQueue = usePlayer((s) => s.addToQueue)
   const playNext = usePlayer((s) => s.playNextInQueue)
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
@@ -56,14 +56,6 @@ export function AlbumPage() {
   const playShuffled = () => {
     if (!shuffle) toggleShuffle()
     playSongs([...songs].sort(() => Math.random() - 0.5), 0)
-  }
-
-  const onStar = async (song: Song) => {
-    try {
-      await toggleStar(song)
-    } catch (error) {
-      toast.error((error as Error).message)
-    }
   }
 
   return (
@@ -153,6 +145,19 @@ export function AlbumPage() {
               </span>
             ) : null}
           </div>
+
+          {/* Album rating. Subsonic stores ratings per song, so an album's
+              rating is the first track's — the same track the heart button
+              above already stars. */}
+          {songs[0] ? (
+            <div className="flex items-center gap-2">
+              <Rating
+                value={songs[0].userRating ?? 0}
+                onChange={(rating) => void onRate(songs[0], rating)}
+              />
+              <span className="text-xs text-faint">Your rating</span>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -184,7 +189,9 @@ export function AlbumPage() {
                       onGoToArtist={song.artistId ? () => artist(song.artistId!) : undefined}
                       onPlayNext={(list) => playNext(list)}
                       onAddToQueue={(list) => addToQueue(list)}
+                      onAddToPlaylist={(list) => requestAddToPlaylist(list.map((item) => item.id))}
                       onStar={(item) => void onStar(item)}
+                      onRate={(item, rating) => void onRate(item, rating)}
                     />
                   ))}
                 </div>

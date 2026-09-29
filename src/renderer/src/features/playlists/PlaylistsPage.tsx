@@ -5,10 +5,17 @@ import { Play, Shuffle, Plus, ListMusic, MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Playlist, Song } from '@shared/types'
 import { downloadMediaUrl } from '@shared/media'
-import { createPlaylist, deletePlaylist, updatePlaylist } from '../../lib/api'
+import { changePlaylistOrder, createPlaylist, deletePlaylist, updatePlaylist } from '../../lib/api'
 import { queryKeys } from '../../lib/query-keys'
 import { useServerId } from '../../store/server'
-import { useLibraryNavigation, usePlayPlaylist, usePlaySongs, usePlaylistsQuery, usePlaylistQuery } from '../shared/hooks'
+import {
+  useLibraryNavigation,
+  usePlayPlaylist,
+  usePlaySongs,
+  usePlaylistsQuery,
+  usePlaylistQuery,
+  useTrackAnnotations
+} from '../shared/hooks'
 import { PageHeader } from '../shared/Page'
 import {
   Button,
@@ -31,9 +38,10 @@ import {
 } from '../../components/ui/overlays'
 import { PlaylistCard } from '../../components/items/Cards'
 import { TrackRow, TrackHeader } from '../../components/items/TrackRow'
+import { requestAddToPlaylist } from '../../components/items/AddToPlaylistDialog'
 import { CoverArt } from '../../components/items/CoverArt'
 import { usePlayer } from '../../store/player'
-import { formatCount, formatTotalDuration } from '../../lib/utils'
+import { cn, formatCount, formatTotalDuration } from '../../lib/utils'
 
 /* ------------------------------------------------------------------ list */
 
@@ -111,7 +119,15 @@ function CreatePlaylistDialog({
   const [isPublic, setIsPublic] = useState(false)
 
   const mutation = useMutation({
-    mutationFn: () => createPlaylist({ name: name.trim(), songIds: initialSongIds ?? [] }),
+    // `comment` and `public` used to be collected in the form but never sent,
+    // so both fields silently did nothing.
+    mutationFn: () =>
+      createPlaylist({
+        name: name.trim(),
+        comment: comment.trim() || undefined,
+        public: isPublic || undefined,
+        songIds: initialSongIds ?? []
+      }),
     onSuccess: async (created) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.playlists(serverId!) })
       toast.success(`Created “${created?.name ?? name}”`)
@@ -191,12 +207,44 @@ export function PlaylistPage() {
   const shuffle = usePlayer((s) => s.shuffle)
   const addToQueue = usePlayer((s) => s.addToQueue)
   const playNext = usePlayer((s) => s.playNextInQueue)
+  const { onStar, onRate } = useTrackAnnotations()
 
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState('')
   const [comment, setComment] = useState('')
+  const [dragFrom, setDragFrom] = useState<number | null>(null)
+  const [dragOver, setDragOver] = useState<number | null>(null)
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.playlists(serverId!) })
+
+  /**
+   * Persists a reorder.
+   *
+   * Subsonic's `changePlaylistOrder` replaces the whole ordering, so the new id
+   * list is built from the copy already in hand. The server response is not
+   * trusted to echo the order back, so the list is refetched afterwards.
+   */
+  const reorder = useMutation({
+    mutationFn: ({ from, to }: { from: number; to: number }) => {
+      const ids = (data?.entry ?? []).map((song) => song.id)
+      const [moved] = ids.splice(from, 1)
+      ids.splice(to, 0, moved)
+      return changePlaylistOrder(playlistId, ids)
+    },
+    onMutate: () => {
+      // Optimistic: the row visibly moves before the round trip finishes.
+      setDragFrom(null)
+      setDragOver(null)
+    },
+    onSuccess: async () => {
+      await invalidate()
+      await refetch()
+    },
+    onError: async (error) => {
+      await refetch()
+      toast.error((error as Error).message)
+    }
+  })
 
   const removeTracks = useMutation({
     mutationFn: (indexes: number[]) =>
@@ -356,18 +404,45 @@ export function PlaylistPage() {
         <div className="space-y-1">
           <TrackHeader />
           {songs.map((song, index) => (
-            <TrackRow
+            <div
               key={`${song.id}-${index}`}
-              song={song}
-              index={index}
-              showAlbum
-              album={{ name: song.album, coverArt: song.coverArt }}
-              onPlay={(target) => playSongs(songs, target)}
-              onPlayNext={(items) => playNext(items)}
-              onAddToQueue={(items) => addToQueue(items)}
-              onDownload={trackDownload}
-              onRemove={() => removeTracks.mutate([index])}
-            />
+              draggable
+              onDragStart={() => setDragFrom(index)}
+              onDragOver={(event) => {
+                event.preventDefault()
+                if (dragOver !== index) setDragOver(index)
+              }}
+              onDrop={(event) => {
+                event.preventDefault()
+                if (dragFrom !== null && dragFrom !== index) reorder.mutate({ from: dragFrom, to: index })
+                setDragFrom(null)
+                setDragOver(null)
+              }}
+              onDragEnd={() => {
+                setDragFrom(null)
+                setDragOver(null)
+              }}
+              className={cn(
+                'rounded-md transition-shadow',
+                dragOver === index && dragFrom !== index && 'ring-1 ring-accent',
+                dragFrom === index && 'opacity-50'
+              )}
+            >
+              <TrackRow
+                song={song}
+                index={index}
+                showAlbum
+                album={{ name: song.album, coverArt: song.coverArt }}
+                onPlay={(target) => playSongs(songs, target)}
+                onPlayNext={(items) => playNext(items)}
+                onAddToQueue={(items) => addToQueue(items)}
+                onAddToPlaylist={(items) => requestAddToPlaylist(items.map((item) => item.id))}
+                onStar={onStar}
+                onRate={onRate}
+                onDownload={trackDownload}
+                onRemove={() => removeTracks.mutate([index])}
+              />
+            </div>
           ))}
         </div>
       )}

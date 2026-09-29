@@ -17,6 +17,8 @@ interface AlbumCardProps extends BaseProps {
   onOpen: (album: Album) => void
   onPlay: (album: Album) => void
   playCount?: number
+  /** Drops padding and the tertiary metadata line so smaller tiles stay readable. */
+  dense?: boolean
 }
 
 interface ArtistCardProps extends BaseProps {
@@ -110,7 +112,8 @@ export const AlbumCard = memo(function AlbumCard({
   album,
   onOpen,
   onPlay,
-  className
+  className,
+  dense = false
 }: AlbumCardProps) {
   const isCurrentAlbum = usePlayer((s) => s.queue[s.index]?.albumId === album.id)
   const playing = usePlayer((s) => s.playing)
@@ -130,8 +133,9 @@ export const AlbumCard = memo(function AlbumCard({
         }
       }}
       className={cn(
-        'group flex w-full flex-col gap-2.5 rounded-app p-2 text-left transition-colors hover:bg-surface-2',
+        'group flex w-full flex-col rounded-app text-left transition-colors hover:bg-surface-2',
         'focus-visible:bg-surface-2 focus-visible:outline-none',
+        dense ? 'gap-1.5 p-1' : 'gap-2.5 p-2',
         className
       )}
     >
@@ -142,6 +146,7 @@ export const AlbumCard = memo(function AlbumCard({
           alt={album.name}
           className={cn(
             'aspect-square w-full',
+            dense ? 'rounded-md' : 'rounded-lg',
             showPause && 'ring-2 ring-accent ring-offset-2 ring-offset-bg'
           )}
         />
@@ -152,9 +157,13 @@ export const AlbumCard = memo(function AlbumCard({
         )}
       </div>
       <div className="min-w-0 px-0.5">
-        <div className="truncate text-sm font-medium text-fg">{album.name}</div>
-        <div className="truncate text-xs text-muted">{subtitle('album', album)}</div>
-        {album.songCount ? (
+        <div className={cn('truncate font-medium text-fg', dense ? 'text-[13px]' : 'text-sm')}>
+          {album.name}
+        </div>
+        <div className={cn('truncate text-muted', dense ? 'text-[11px]' : 'text-xs')}>
+          {subtitle('album', album)}
+        </div>
+        {!dense && album.songCount ? (
           <div className="mt-0.5 truncate text-[11px] text-faint">
             {formatCount(album.songCount, 'track')}
             {album.duration ? ` · ${formatTotalDuration(album.duration)}` : ''}

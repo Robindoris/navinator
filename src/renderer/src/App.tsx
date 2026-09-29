@@ -6,6 +6,8 @@ import { ConnectScreen } from './features/connect/ConnectScreen'
 import { useServer } from './store/server'
 import { useSettings } from './store/settings'
 import { useMediaSession } from './player/useMediaSession'
+import { UpdateNotifier } from './components/layout/UpdateNotifier'
+import { initUpdateListener } from './store/updates'
 import { useAudioSettingsSync, useKeyboardShortcuts } from './player/useShortcuts'
 import { bridge } from './lib/bridge'
 import { TooltipProvider } from './components/ui/overlays'
@@ -50,6 +52,7 @@ export function App() {
 
   useThemeEffect()
   useMediaSession()
+  initUpdateListener()
   useAudioSettingsSync()
   useKeyboardShortcuts()
 
@@ -84,6 +87,7 @@ export function App() {
   return (
     <TooltipProvider delayDuration={350}>
       {connected ? <AppShell /> : <ConnectScreen />}
+      <UpdateNotifier />
       <Toaster
         position="bottom-center"
         theme={document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'}

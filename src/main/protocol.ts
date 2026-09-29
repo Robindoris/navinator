@@ -160,6 +160,13 @@ export function registerMediaProtocol(): void {
           upstream = await connection.buildAvatarUrl(url.searchParams.get('username') ?? '', size ? Number(size) : undefined)
           break
         }
+        case 'radio': {
+          if (!id) return errorResponse('Missing station id', 400)
+          // Resolved against the server's own station list, never taken from the
+          // page — see `resolveStationUrl` for why that matters.
+          upstream = await connection.resolveStationUrl(id)
+          break
+        }
         default:
           return errorResponse('Unknown media kind', 404)
       }
@@ -182,7 +189,7 @@ export function registerMediaProtocol(): void {
       return errorResponse(error instanceof Error ? error.message : 'Upstream request failed', 502)
     }
 
-    const isAudio = kind === 'song' || kind === 'download'
+    const isAudio = kind === 'song' || kind === 'download' || kind === 'radio'
 
     const out = new Headers()
     for (const name of RELAYED_HEADERS) {

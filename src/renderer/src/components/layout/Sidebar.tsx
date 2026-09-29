@@ -9,6 +9,7 @@ import {
   ListMusic,
   Settings as SettingsIcon,
   Search,
+  Radio,
   ChevronsLeft,
   ChevronsRight
 } from 'lucide-react'
@@ -39,7 +40,8 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { to: '/albums', label: 'Albums', icon: Disc3 },
       { to: '/artists', label: 'Artists', icon: Users },
       { to: '/playlists', label: 'Playlists', icon: ListMusic },
-      { to: '/genres', label: 'Genres', icon: Library }
+      { to: '/genres', label: 'Genres', icon: Library },
+      { to: '/radio', label: 'Radio', icon: Radio }
     ]
   },
   {

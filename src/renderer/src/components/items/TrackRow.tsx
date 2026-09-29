@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { Play, Pause, Heart, MoreHorizontal, ListPlus, Timer } from 'lucide-react'
+import { Play, Pause, Heart, MoreHorizontal, ListPlus, Timer, Star } from 'lucide-react'
 import type { Song } from '@shared/types'
 import { cn, formatDuration, formatCount, formatBitrate, formatBytes } from '../../lib/utils'
 import { usePlayer } from '../../store/player'
@@ -9,6 +9,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   Tooltip
 } from '../ui/overlays'
@@ -25,7 +28,10 @@ interface TrackActions {
   onPlay: (index: number) => void
   onPlayNext?: (songs: Song[]) => void
   onAddToQueue?: (songs: Song[]) => void
+  onAddToPlaylist?: (songs: Song[]) => void
   onStar?: (song: Song) => void
+  /** Sets a 1–5 star rating; 0 clears it. */
+  onRate?: (song: Song, rating: number) => void
   onGoToAlbum?: (song: Song) => void
   onGoToArtist?: (song: Song) => void
   onDownload?: (song: Song) => void
@@ -66,7 +72,9 @@ export const TrackRow = memo(function TrackRow({
   onPlay,
   onPlayNext,
   onAddToQueue,
+  onAddToPlaylist,
   onStar,
+  onRate,
   onGoToAlbum,
   onGoToArtist,
   onDownload,
@@ -165,7 +173,7 @@ export const TrackRow = memo(function TrackRow({
           )}
         </div>
         <div className="flex items-center gap-1.5 truncate text-xs text-muted">
-          {onGoToArtist && song.artist ? (
+          {onGoToArtist && song.artist && !song.isRadio ? (
             <button
               type="button"
               onClick={(event) => {
@@ -179,7 +187,7 @@ export const TrackRow = memo(function TrackRow({
           ) : (
             <span className="truncate">{song.artist ?? 'Unknown artist'}</span>
           )}
-          {showAlbum && album?.name && (
+          {showAlbum && album?.name && !song.isRadio && (
             <>
               <span aria-hidden>·</span>
               {onGoToAlbum ? (
@@ -213,7 +221,7 @@ export const TrackRow = memo(function TrackRow({
             {song.playCount ? formatCount(song.playCount, 'play') : formatDuration(song.duration)}
           </span>
         )}
-        {onStar && (
+        {onStar && !song.isRadio && (
           <Tooltip label={song.starred ? 'Remove from favourites' : 'Add to favourites'}>
             <IconButton
               label="Favourite"
@@ -253,7 +261,12 @@ export const TrackRow = memo(function TrackRow({
                 Add to queue
               </DropdownMenuItem>
             )}
-            {onStar && (
+            {onAddToPlaylist && !song.isRadio && (
+              <DropdownMenuItem icon={ListPlus} onSelect={() => onAddToPlaylist([song])}>
+                Add to playlist
+              </DropdownMenuItem>
+            )}
+            {onStar && !song.isRadio && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -264,7 +277,38 @@ export const TrackRow = memo(function TrackRow({
                 </DropdownMenuItem>
               </>
             )}
-            {onDownload && song.suffix && !song.starred && (
+            {onRate && !song.isRadio && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-fg outline-none select-none data-[highlighted]:bg-surface-2">
+                    <Star className="size-4 shrink-0 opacity-70" />
+                    {song.userRating ? `Rated ${song.userRating}/5` : 'Rate'}
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {[1, 2, 3, 4, 5].map((rating) => (
+                      <DropdownMenuItem
+                        key={rating}
+                        onSelect={() => onRate(song, rating)}
+                        className={cn(
+                          song.userRating === rating && 'text-accent'
+                        )}
+                      >
+                        <span aria-hidden>{'★'.repeat(rating)}</span>
+                        <span className="sr-only">Rate {rating} out of 5</span>
+                      </DropdownMenuItem>
+                    ))}
+                    {song.userRating ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => onRate(song, 0)}>Clear rating</DropdownMenuItem>
+                      </>
+                    ) : null}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </>
+            )}
+            {onDownload && song.suffix && !song.starred && !song.isRadio && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => onDownload(song)}>

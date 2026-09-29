@@ -6,7 +6,7 @@ import { Tooltip } from '../../components/ui/overlays'
 import { TrackRow, TrackHeader } from '../../components/items/TrackRow'
 import { CoverArt } from '../../components/items/CoverArt'
 import { usePlayer } from '../../store/player'
-import { useLibraryNavigation } from '../shared/hooks'
+import { useLibraryNavigation, useTrackAnnotations } from '../shared/hooks'
 import { formatDuration, formatTotalDuration } from '../../lib/utils'
 import { useState } from 'react'
 
@@ -30,6 +30,7 @@ export function QueuePage() {
   const cycleRepeat = usePlayer((s) => s.cycleRepeat)
   const addToQueue = usePlayer((s) => s.addToQueue)
   const playNext = usePlayer((s) => s.playNextInQueue)
+  const { onStar, onRate } = useTrackAnnotations()
   const { artist, album: openAlbum } = useLibraryNavigation()
 
   const [dragging, setDragging] = useState<number | null>(null)
@@ -141,6 +142,8 @@ export function QueuePage() {
                   onGoToArtist={() => song.artistId && artist(song.artistId)}
                   onPlayNext={(items) => playNext(items)}
                   onAddToQueue={(items) => addToQueue(items)}
+                  onStar={onStar}
+                  onRate={onRate}
                   onRemove={() => removeAt(position)}
                 />
               </div>

@@ -1,4 +1,5 @@
 import type { AlbumListType } from './api'
+import { NO_SEARCH_OFFSETS, type SearchOffsets } from './api'
 
 /**
  * Centralised TanStack Query keys.
@@ -28,7 +29,8 @@ export const queryKeys = {
   album: (serverId: string, id: string) => ['server', serverId, 'album', id] as const,
   song: (serverId: string, id: string) => ['server', serverId, 'song', id] as const,
 
-  search: (serverId: string, query: string) => ['server', serverId, 'search', query] as const,
+  search: (serverId: string, query: string, offsets: SearchOffsets = NO_SEARCH_OFFSETS) =>
+    ['server', serverId, 'search', query, offsets] as const,
 
   playlists: (serverId: string) => ['server', serverId, 'playlists'] as const,
   playlist: (serverId: string, id: string) => ['server', serverId, 'playlist', id] as const,
