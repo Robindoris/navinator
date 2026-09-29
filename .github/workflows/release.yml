@@ -156,12 +156,28 @@ jobs:
         # macOS x64 is cross-built on the arm64 runner. Only the zip/dmg tooling
         # is host-native, and both operate on plain files, so no Rosetta or
         # emulation is required — it is just slower.
-        run: npx electron-builder --${{ matrix.platform }} --x64 --arm64 --publish never
-        env:
-          # Signing is opt-in. With no secrets set, electron-builder skips it and
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Signing is opt-in: the cert is only exported when a secret exists
+          # for this platform. Otherwise electron-builder skips signing and
           # still produces working, unsigned installers.
-          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK || secrets.WIN_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || secrets.WIN_CSC_KEY_PASSWORD }}
+          if [[ -n "${SIGNING_CERTIFICATE:-}" ]]; then
+            export CSC_LINK="$SIGNING_CERTIFICATE"
+            export CSC_KEY_PASSWORD="${SIGNING_PASSWORD:-}"
+          fi
+
+          npx electron-builder \
+            --${{ matrix.platform }} \
+            --x64 \
+            --arm64 \
+            --publish never
+        env:
+          # Per-platform cert; empty on Linux and when the secret is unset, so
+          # the conditional export above stays skipped.
+          SIGNING_CERTIFICATE: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK || (matrix.platform == 'win' && secrets.WIN_CSC_LINK || '') }}
+          SIGNING_PASSWORD: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || (matrix.platform == 'win' && secrets.WIN_CSC_KEY_PASSWORD || '') }}
           # electron-builder notarises automatically when these are present.
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
