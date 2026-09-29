@@ -20,6 +20,12 @@ export const queryKeys = {
 
   albumList: (serverId: string, type: AlbumListType, extra?: Record<string, unknown>) =>
     ['server', serverId, 'albumList', type, extra ?? {}] as const,
+  // `useAlbumListPages` stores react-query's infinite-query shape
+  // (`{pages, pageParams}`), which must never share a cache slot with the
+  // plain `Album[]` stored under `albumList` — reading one shape where the
+  // other lives throws in whichever hook gets there second.
+  albumListPages: (serverId: string, type: AlbumListType, extra?: Record<string, unknown>) =>
+    ['server', serverId, 'albumListPages', type, extra ?? {}] as const,
 
   starred: (serverId: string) => ['server', serverId, 'starred'] as const,
   nowPlaying: (serverId: string) => ['server', serverId, 'nowPlaying'] as const,

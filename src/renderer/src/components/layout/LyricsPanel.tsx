@@ -27,9 +27,14 @@ export function LyricsPanel({ onClose }: { onClose: () => void }) {
   const { data, isLoading, isFetching } = useLyricsQuery(songId)
 
   // Servers can return several translations; default to the first and let the
-  // user switch without refetching.
+  // user switch without refetching. Reset when the track changes (done during
+  // render, not in an effect, to avoid a cascading render).
   const [langIndex, setLangIndex] = useState(0)
-  useEffect(() => setLangIndex(0), [songId])
+  const [prevSongId, setPrevSongId] = useState(songId)
+  if (prevSongId !== songId) {
+    setPrevSongId(songId)
+    setLangIndex(0)
+  }
 
   const lyric: StructuredLyric | undefined = data?.[langIndex]
   const lines = useMemo(() => lyric?.line ?? [], [lyric])

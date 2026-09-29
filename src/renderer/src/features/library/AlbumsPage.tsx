@@ -37,19 +37,20 @@ export function AlbumsPage() {
 
   // Pull the next page when the bottom of the list comes into view. The button
   // stays as a fallback for anyone who never quite reaches the end.
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query
   useEffect(() => {
     const node = sentinel.current
     if (!node) return
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting) return
-        if (query.hasNextPage && !query.isFetchingNextPage) void query.fetchNextPage()
+        if (hasNextPage && !isFetchingNextPage) void fetchNextPage()
       },
       { rootMargin: '600px' }
     )
     observer.observe(node)
     return () => observer.disconnect()
-  }, [query.hasNextPage, query.isFetchingNextPage, query.fetchNextPage])
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   // Filtering is client side: the loaded pages are already in memory, and a
   // request per keystroke against `search3` would be both slower and worse for

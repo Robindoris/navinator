@@ -322,7 +322,7 @@ export type UpdateState =
   | { kind: 'downloading'; percent: number }
   | { kind: 'downloaded'; version: string }
   | { kind: 'up-to-date' }
-  | { kind: 'error'; message: string }
+  | { kind: 'error'; message: string; manual: boolean }
 
 /* ---------------------------------------------------------------------- misc */
 

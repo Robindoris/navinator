@@ -47,7 +47,7 @@ export function PlayerBar({ lyricsOpen, onToggleLyrics }: { lyricsOpen: boolean;
   // While the user drags the scrubber we show their value, not the engine's,
   // otherwise the handle fights the pointer.
   const [scrubbing, setScrubbing] = useState<number | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [spinning, setSpinning] = useState(false)
   const loadTimer = useRef<number | null>(null)
 
   const displayPosition = scrubbing ?? position
@@ -67,15 +67,22 @@ export function PlayerBar({ lyricsOpen, onToggleLyrics }: { lyricsOpen: boolean;
   )
 
   // Show a spinner for the moment between tapping play and audio starting.
+  // The wait is armed when `playing` or the track changes (during render) and
+  // disarmed by a timer, so the effect body never sets state synchronously.
+  const playKey = `${playing}:${song?.id ?? ''}`
+  const [prevPlayKey, setPrevPlayKey] = useState(playKey)
+  if (prevPlayKey !== playKey) {
+    setPrevPlayKey(playKey)
+    setSpinning(!playing)
+  }
+
   useEffect(() => {
-    if (playing) {
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    const timer = window.setTimeout(() => setLoading(false), 1200)
+    if (!spinning) return
+    const timer = window.setTimeout(() => setSpinning(false), 1200)
     return () => window.clearTimeout(timer)
-  }, [playing, song?.id])
+  }, [spinning])
+
+  const loading = spinning && !playing
 
   useEffect(() => () => {
     if (loadTimer.current) window.clearTimeout(loadTimer.current)

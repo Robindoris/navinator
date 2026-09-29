@@ -74,10 +74,11 @@ export function useAlbumListPages(
   const paged = type !== 'random'
 
   const query = useInfiniteQuery({
-    queryKey: queryKeys.albumList(serverId!, type, extra),
+    queryKey: queryKeys.albumListPages(serverId!, type, extra),
     queryFn: ({ pageParam }) => getAlbumList(type, ALBUM_PAGE_SIZE, pageParam, extra),
     initialPageParam: 0,
-    getNextPageParam: (lastPage) => (paged && lastPage.length === ALBUM_PAGE_SIZE ? lastPage.length : undefined),
+    getNextPageParam: (lastPage) =>
+      paged && lastPage?.length === ALBUM_PAGE_SIZE ? lastPage.length : undefined,
     enabled: Boolean(serverId),
     staleTime: type === 'random' ? 0 : STALE.library
   })
@@ -313,7 +314,7 @@ export function usePlayAlbum() {
 
   return useCallback(
     async (albumId: string, album?: Album) => {
-      let songs: Song[] = []
+      let songs: Song[]
 
       const cached = queryClient.getQueryData<Album>(queryKeys.album(serverId!, albumId))
       if (cached?.songList?.length) {

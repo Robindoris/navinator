@@ -67,19 +67,46 @@ export function useMediaSession(): void {
 
   useEffect(() => registerActionHandlers(), [])
 
-  /* Now-playing card shown by the OS (Windows SMTC, macOS, GNOME). */
+  /* Now-playing card shown by the OS (Windows SMTC, macOS, GNOME).
+   *
+   * MediaMetadata artwork only accepts http/https/data/blob URLs, so the
+   * privileged `navinator://` cover URL is fetched (the scheme is registered
+   * with supportFetchAPI) and handed over as a blob URL. Without this Chromium
+   * drops the artwork and logs "MediaImage src can only be of http/https/data/
+   * blob scheme".
+   */
   useEffect(() => {
     if (!('mediaSession' in navigator)) return
     if (!song) {
       navigator.mediaSession.metadata = null
       return
     }
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: song.title,
-      artist: song.artist ?? undefined,
-      album: song.album ?? undefined,
-      artwork: song.coverArt ? [{ src: coverMediaUrl(song.coverArt, 512), sizes: '512x512' }] : []
-    })
+    let cancelled = false
+    let objectUrl: string | undefined
+    const apply = (artwork: MediaImage[]) => {
+      if (cancelled) return
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: song.title,
+        artist: song.artist ?? undefined,
+        album: song.album ?? undefined,
+        artwork
+      })
+    }
+    if (!song.coverArt) {
+      apply([])
+    } else {
+      fetch(coverMediaUrl(song.coverArt, 512))
+        .then((response) => (response.ok ? response.blob() : Promise.reject(new Error(String(response.status)))))
+        .then((blob) => {
+          objectUrl = URL.createObjectURL(blob)
+          apply([{ src: objectUrl, sizes: '512x512', type: blob.type }])
+        })
+        .catch(() => apply([]))
+    }
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
   }, [song])
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { call } from './bridge'
-import type { Song, Album, Playlist, Genre, SearchResults, ScanStatus, User } from '@shared/types'
+import type { Song, Album, Artist, ArtistIndex, Playlist, Genre, SearchResults, ScanStatus, User, InternetRadioStation } from '@shared/types'
 
 /**
  * Typed wrappers around the Subsonic endpoints.
@@ -42,12 +42,17 @@ export const getMusicFolders = () =>
   )
 
 export const getArtists = () =>
-  call<{ artists: { index: { name: string; artist: any[] }[] } }>('getArtists').then((r) => [
+  call<{ artists: { index: ArtistIndex[] } }>('getArtists').then((r) => [
     ...(r.artists?.index ?? [])
   ])
 
 export const getArtist = (id: string) =>
-  call<{ artist: any }>('getArtist', [{ id }]).then((r) => r.artist)
+  call<{ artist: ArtistWithAlbums }>('getArtist', [{ id }]).then((r) => r.artist)
+
+/** `getArtist` response: the artist plus album stubs without track listings. */
+export interface ArtistWithAlbums extends Artist {
+  album?: { id: string; name: string; coverArt?: string; songCount?: number }[]
+}
 
 /* ------------------------------------------------------------- album lists */
 
@@ -69,7 +74,7 @@ export const getAlbumList = (type: AlbumListType, size = 100, offset = 0, extra:
   ]).then((r) => r.albumList2?.album ?? [])
 
 export const getStarred = () =>
-  call<{ starred2: { album: Album[]; song: Song[]; artist: any[] } }>('getStarred2').then((r) => ({
+  call<{ starred2: { album: Album[]; song: Song[]; artist: Artist[] } }>('getStarred2').then((r) => ({
     albums: r.starred2?.album ?? [],
     songs: r.starred2?.song ?? [],
     artists: r.starred2?.artist ?? []
@@ -261,6 +266,6 @@ export const savePlayQueue = (ids: string[], current?: string, position?: number
   call('savePlayQueue', [{ id: ids, current, position }])
 
 export const getRadioStations = () =>
-  call<{ internetRadioStations: { internetRadioStation: any[] } }>('getInternetRadioStations').then(
+  call<{ internetRadioStations: { internetRadioStation: InternetRadioStation[] } }>('getInternetRadioStations').then(
     (r) => r.internetRadioStations?.internetRadioStation ?? []
   )

@@ -32,9 +32,14 @@ export function UpdateNotifier() {
         })
         break
       case 'error':
-        // A silent background check failing is not news; a manual one is, and it
-        // arrives here with the message either way.
-        toast.error('Could not check for updates', { description: state.message })
+        // Only surface a failure the user asked about. A background check on a
+        // repo with no published release answers 406 every single time, and a
+        // toast for that on every launch would be indefensible noise.
+        if (state.manual) {
+          toast.error('Could not check for updates', { description: state.message })
+        } else {
+          console.warn('[updates] background check failed:', state.message)
+        }
         break
       default:
         break

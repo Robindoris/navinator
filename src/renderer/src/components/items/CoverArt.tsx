@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Music } from 'lucide-react'
 import { coverMediaUrl, avatarMediaUrl, placeholderCoverDataUrl } from '@shared/media'
 import { cn } from '../../lib/utils'
@@ -12,6 +12,9 @@ import { cn } from '../../lib/utils'
  * right colours immediately and only sharpens when the real cover arrives.
  */
 const colourCache = new Map<string, string>()
+// Failed extractions are remembered too, so a grid with broken covers does
+// not retry the decode on every render.
+const sampledIds = new Set<string>()
 
 function extractDominantColour(src: string): Promise<string | null> {
   return new Promise((resolve) => {
@@ -56,29 +59,29 @@ export function CoverArt({
   eager?: boolean
 }) {
   const [loaded, setLoaded] = useState(false)
-  const [tint, setTint] = useState<string | null>(null)
-  const sampled = useRef(false)
+  const [tint, setTint] = useState<string | null>(() => (id ? colourCache.get(id) ?? null : null))
 
   const src = id ? coverMediaUrl(id, size) : placeholderCoverDataUrl()
 
-  useEffect(() => {
+  // A different cover means the old loaded/tint state no longer applies.
+  // Adjust during render rather than in an effect to avoid a cascading render.
+  const [prevId, setPrevId] = useState(id)
+  if (prevId !== id) {
+    setPrevId(id)
     setLoaded(false)
-    sampled.current = false
-    if (!id) return
-    const cached = colourCache.get(id)
-    if (cached) {
-      setTint(cached)
-      return
-    }
-    // Sample once per cover id; a large grid would otherwise decode every
-    // image twice.
-    if (sampled.current) return
-    sampled.current = true
+    setTint(id ? colourCache.get(id) ?? null : null)
+  }
+
+  // Sample once per cover id; a large grid would otherwise decode every
+  // image twice.
+  useEffect(() => {
+    if (!id || tint !== null || sampledIds.has(id)) return
+    sampledIds.add(id)
     void extractDominantColour(src).then((colour) => {
       if (colour && colourCache.size < 800) colourCache.set(id, colour)
       setTint(colour)
     })
-  }, [id, src])
+  }, [id, src, tint])
 
   return (
     <div

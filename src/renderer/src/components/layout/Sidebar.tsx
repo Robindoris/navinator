@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import {
   Compass,
@@ -55,15 +55,13 @@ export function Sidebar() {
   const queueCount = usePlayer((s) => s.queue.length)
   const username = useServer((s) => s.connection.profile?.username)
   const serverName = useServer((s) => s.connection.profile?.name)
-  const [collapsed, setCollapsed] = useState(false)
-
-  useEffect(() => {
+  const [collapsed, setCollapsed] = useState(() => {
     try {
-      setCollapsed(localStorage.getItem('navinator:sidebar') === 'collapsed')
+      return localStorage.getItem('navinator:sidebar') === 'collapsed'
     } catch {
-      /* first run */
+      return false
     }
-  }, [])
+  })
 
   const toggle = () => {
     setCollapsed((value) => {

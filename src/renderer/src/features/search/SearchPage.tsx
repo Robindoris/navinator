@@ -68,8 +68,13 @@ export function SearchPage() {
   const enabled = Boolean(serverId && debounced.trim().length >= 2)
 
   // A new term must start from a clean slate, or stale offsets would skip
-  // straight past the top of the new result set.
-  useEffect(() => setOffsets(NO_SEARCH_OFFSETS), [debounced])
+  // straight past the top of the new result set. Resetting happens during
+  // render, not in an effect, to avoid a cascading render.
+  const [prevDebounced, setPrevDebounced] = useState(debounced)
+  if (prevDebounced !== debounced) {
+    setPrevDebounced(debounced)
+    setOffsets(NO_SEARCH_OFFSETS)
+  }
 
   const query = useQuery({
     queryKey: queryKeys.search(serverId!, debounced, offsets),
