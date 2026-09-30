@@ -16,13 +16,13 @@ import {
   usePlayArtist,
   usePlayPlaylist,
   usePlaySongs,
-  useTrackAnnotations
+  useTrackAnnotations,
+  useTrackRowActions
 } from '../shared/hooks'
 import { AlbumGrid, PageHeader, Section } from '../shared/Page'
 import { EmptyState, Skeleton, IconButton, Button } from '../../components/ui/primitives'
 import { ArtistCard, PlaylistCard } from '../../components/items/Cards'
 import { TrackRow, TrackHeader } from '../../components/items/TrackRow'
-import { requestAddToPlaylist } from '../../components/items/AddToPlaylistDialog'
 import { usePlayer } from '../../store/player'
 
 /** Debounces keystrokes so typing does not fire a request per character. */
@@ -45,9 +45,8 @@ export function SearchPage() {
   const playAlbum = usePlayAlbum()
   const playArtist = usePlayArtist()
   const playPlaylist = usePlayPlaylist()
-  const addToQueue = usePlayer((s) => s.addToQueue)
-  const playNext = usePlayer((s) => s.playNextInQueue)
   const { onStar, onRate } = useTrackAnnotations()
+  const trackActions = useTrackRowActions()
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
   const shuffle = usePlayer((s) => s.shuffle)
 
@@ -202,7 +201,7 @@ export function SearchPage() {
                   type="button"
                   onClick={() => results.songs.length > 0 && playSongs(results.songs, 0)}
                   disabled={results.songs.length === 0}
-                  className="inline-flex items-center gap-1 text-xs text-accent hover:underline disabled:opacity-40"
+                  className="inline-flex items-center gap-1 text-xs text-accent-strong hover:underline disabled:opacity-40"
                 >
                   <Play className="size-3 fill-current" />
                   Play matching songs
@@ -231,7 +230,7 @@ export function SearchPage() {
                   <button
                     type="button"
                     onClick={() => playSongs(results.songs, 0)}
-                    className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                    className="inline-flex items-center gap-1 text-xs text-accent-strong hover:underline"
                   >
                     <Play className="size-3 fill-current" />
                     Play
@@ -242,7 +241,7 @@ export function SearchPage() {
                       if (!shuffle) toggleShuffle()
                       playSongs([...results.songs].sort(() => Math.random() - 0.5), 0)
                     }}
-                    className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                    className="inline-flex items-center gap-1 text-xs text-accent-strong hover:underline"
                   >
                     <Shuffle className="size-3" />
                     Shuffle
@@ -262,9 +261,7 @@ export function SearchPage() {
                     onPlay={(target) => playSongs(results.songs, target)}
                     onGoToAlbum={() => song.albumId && album(song.albumId)}
                     onGoToArtist={() => song.artistId && artist(song.artistId)}
-                    onPlayNext={(items) => playNext(items)}
-                    onAddToQueue={(items) => addToQueue(items)}
-                    onAddToPlaylist={(items) => requestAddToPlaylist(items.map((item) => item.id))}
+                    {...trackActions}
                     onStar={onStar}
                     onRate={onRate}
                   />

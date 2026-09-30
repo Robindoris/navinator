@@ -2,10 +2,11 @@ import { memo } from 'react'
 import { Play, Pause, Music2, Disc3 } from 'lucide-react'
 import type { Album, Artist, Playlist } from '@shared/types'
 import { cn, formatTotalDuration, formatYear, formatCount } from '../../lib/utils'
-import { usePlayer } from '../../store/player'
 import { CoverArt } from './CoverArt'
 
 type CardVariant = 'album' | 'artist' | 'playlist'
+
+const NOOP = (): void => undefined
 
 interface BaseProps {
   className?: string
@@ -17,6 +18,13 @@ interface AlbumCardProps extends BaseProps {
   onOpen: (album: Album) => void
   onPlay: (album: Album) => void
   playCount?: number
+  /**
+   * Whether this album is the one currently playing. Passed in rather than read
+   * from the store so a grid of any size costs one subscription, not N.
+   */
+  isPlaying?: boolean
+  /** Pauses the current track. Only meaningful alongside `isPlaying`. */
+  onPause?: () => void
   /** Drops padding and the tertiary metadata line so smaller tiles stay readable. */
   dense?: boolean
 }
@@ -110,15 +118,20 @@ function PauseOverlay({ label, onClick }: { label: string; onClick: () => void }
 
 export const AlbumCard = memo(function AlbumCard({
   album,
+  isPlaying = false,
   onOpen,
   onPlay,
+  onPause,
   className,
   dense = false
 }: AlbumCardProps) {
-  const isCurrentAlbum = usePlayer((s) => s.queue[s.index]?.albumId === album.id)
-  const playing = usePlayer((s) => s.playing)
-  const toggle = usePlayer((s) => s.toggle)
-  const showPause = isCurrentAlbum && playing
+  // Deliberately no store subscription here. `memo` never shields a component
+  // from its own `usePlayer` call, so a per-card subscription meant every
+  // play/pause re-rendered all N cards in a grid — on a 10,000-album library
+  // that is 10,000 components and their cover children, several times a second
+  // during playback. The caller resolves this card's playing state once and
+  // passes it down, so a store write touches one subscriber instead of N.
+  const showPause = isPlaying
 
   return (
     <div
@@ -133,8 +146,8 @@ export const AlbumCard = memo(function AlbumCard({
         }
       }}
       className={cn(
-        'group flex w-full flex-col rounded-app text-left transition-colors hover:bg-surface-2',
-        'focus-visible:bg-surface-2 focus-visible:outline-none',
+        'cv-item group flex w-full flex-col rounded-app text-left transition-colors hover:bg-surface-2',
+        'focus-visible:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
         dense ? 'gap-1.5 p-1' : 'gap-2.5 p-2',
         className
       )}
@@ -151,7 +164,9 @@ export const AlbumCard = memo(function AlbumCard({
           )}
         />
         {showPause ? (
-          <PauseOverlay label={`Pause ${album.name}`} onClick={toggle} />
+          // `onPause` is only absent for a card rendered outside a grid, which
+          // cannot be the playing album, so this branch is unreachable there.
+          <PauseOverlay label={`Pause ${album.name}`} onClick={onPause ?? NOOP} />
         ) : (
           <PlayOverlay label={`Play ${album.name}`} onClick={() => onPlay(album)} />
         )}
@@ -189,8 +204,8 @@ export const ArtistCard = memo(function ArtistCard({ artist, onOpen, onPlay, cla
         }
       }}
       className={cn(
-        'group flex w-full flex-col items-center gap-2.5 rounded-app p-3 text-center transition-colors hover:bg-surface-2',
-        'focus-visible:bg-surface-2 focus-visible:outline-none',
+        'cv-item group flex w-full flex-col items-center gap-2.5 rounded-app p-3 text-center transition-colors hover:bg-surface-2',
+        'focus-visible:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
         className
       )}
     >
@@ -237,8 +252,8 @@ export const PlaylistCard = memo(function PlaylistCard({
         }
       }}
       className={cn(
-        'group flex w-full flex-col gap-2.5 rounded-app p-2 text-left transition-colors hover:bg-surface-2',
-        'focus-visible:bg-surface-2 focus-visible:outline-none',
+        'cv-item group flex w-full flex-col gap-2.5 rounded-app p-2 text-left transition-colors hover:bg-surface-2',
+        'focus-visible:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
         className
       )}
     >
@@ -294,7 +309,7 @@ export function MediaRow({
       onKeyDown={(event) => {
         if (event.key === 'Enter') onClick()
       }}
-      className="group flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+      className="cv-row group flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
     >
       <CoverArt id={coverArt} size={128} alt="" className="size-11 shrink-0" />
       <div className="min-w-0 flex-1">

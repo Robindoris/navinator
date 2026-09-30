@@ -37,12 +37,15 @@ export function createMainWindow(): BrowserWindow {
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 18 } : undefined,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
+      preload: join(__dirname, '../preload/index.cjs'),
       // The renderer handles no Node access at all: every privileged operation
       // goes through the narrow preload bridge.
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      // Electron sandboxes renderers by default; enabling it explicitly keeps
+      // that guarantee from being lost. It requires a CommonJS preload, which
+      // is why `electron.vite.config.ts` emits `index.cjs` and not `.mjs`.
+      sandbox: true,
       // Media keys are delivered to the page, and the audio element is
       // controlled from the renderer, so background throttling must be off.
       backgroundThrottling: false,

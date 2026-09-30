@@ -15,7 +15,7 @@ const buttonVariants = cva(
         primary: 'bg-accent text-accent-fg hover:bg-accent-hover shadow-sm',
         secondary: 'bg-surface-2 text-fg hover:bg-surface-3 border border-line',
         ghost: 'text-muted hover:text-fg hover:bg-surface-2',
-        subtle: 'bg-accent-soft text-accent hover:bg-accent hover:text-accent-fg',
+        subtle: 'bg-accent-soft text-accent-strong hover:bg-accent hover:text-accent-fg',
         danger: 'bg-danger text-white hover:brightness-110 shadow-sm',
         outline: 'border border-line text-fg hover:bg-surface-2'
       },
@@ -75,7 +75,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         buttonVariants({ variant, size }),
         // Active toggles (shuffle, repeat) get a filled pill so their state is
         // readable at a glance without relying on colour alone.
-        active && 'bg-accent-soft text-accent',
+        active && 'bg-accent-soft text-accent-strong',
         className
       )}
       {...props}
@@ -104,9 +104,19 @@ export function Field({
 }) {
   return (
     <div className={cn('space-y-1.5', className)}>
-      <label htmlFor={htmlFor} className="block text-xs font-medium text-muted">
-        {label}
-      </label>
+      {/*
+        A `<label htmlFor={undefined}>` is a label bound to nothing: the widget
+        inside gets no accessible name at all. Three call sites (crossfade
+        slider, mode `Segmented`, theme picker) have no `htmlFor` to give, so
+        render a plain caption there and leave real `<label>`s alone.
+      */}
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className="block text-xs font-medium text-muted">
+          {label}
+        </label>
+      ) : (
+        <span className="block text-xs font-medium text-muted">{label}</span>
+      )}
       {children}
       {error ? (
         <p className="text-xs text-danger">{error}</p>
@@ -158,7 +168,7 @@ export function Badge({
 }) {
   const tones = {
     neutral: 'bg-surface-3 text-muted',
-    accent: 'bg-accent-soft text-accent',
+    accent: 'bg-accent-soft text-accent-strong',
     success: 'bg-success/15 text-success',
     danger: 'bg-danger/15 text-danger'
   }
@@ -212,7 +222,12 @@ export function EmptyState({
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+    // `role="alert"` so a failed query is announced. Without it this state is
+    // purely visual — a screen-reader user gets no feedback at all.
+    <div
+      role="alert"
+      className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"
+    >
       <h3 className="text-sm font-medium text-fg">Something went wrong</h3>
       <p className="max-w-md text-xs text-muted">{message}</p>
       {onRetry && (
@@ -246,8 +261,8 @@ export function Rating({
           aria-label={readOnly ? `Rated ${value} out of 5` : `Rate ${star} out of 5`}
           className={cn(
             'text-sm transition-colors',
-            readOnly ? 'cursor-default' : 'cursor-pointer hover:text-accent',
-            star <= value ? 'text-accent' : 'text-faint'
+            readOnly ? 'cursor-default' : 'cursor-pointer hover:text-accent-strong',
+            star <= value ? 'text-accent-strong' : 'text-faint'
           )}
         >
           ★

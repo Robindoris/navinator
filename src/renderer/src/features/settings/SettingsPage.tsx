@@ -145,6 +145,10 @@ export function SettingsPage() {
                 value={[audio.crossfade]}
                 max={8000}
                 step={250}
+                // `Field` has no `htmlFor` for a slider, so the accessible name
+                // and the unit have to come from the widget itself.
+                aria-label="Crossfade duration"
+                aria-valuetext={`${audio.crossfade} milliseconds`}
                 onValueChange={(value) => patch({ audio: { crossfade: value[0] } })}
               />
             </Field>
@@ -224,6 +228,7 @@ export function SettingsPage() {
 
           <Field label="Mode">
             <Segmented<ThemeMode>
+              label="Colour mode"
               value={settings.theme}
               onChange={(value) => patch({ theme: value })}
               options={[
@@ -349,7 +354,7 @@ function Section({
   return (
     <section className="space-y-3">
       <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight text-fg">
-        <Icon className="size-4 text-accent" />
+        <Icon className="size-4 text-accent-strong" />
         {title}
       </h2>
       <div className="rounded-app border border-line bg-surface p-4">{children}</div>

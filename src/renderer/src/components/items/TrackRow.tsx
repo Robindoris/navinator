@@ -104,15 +104,24 @@ export const TrackRow = memo(function TrackRow({
 
   return (
     <div
-      role="row"
+      // Was `role="row"`, which is only valid inside a `table`/`grid`/`rowgroup`
+      // and requires `role="cell"` children. These rows are plain divs in a
+      // plain div, so screen readers silently discarded the role and the
+      // intended semantics never surfaced. A named, focusable element that
+      // describes the track is both valid and more useful than a fake row.
       tabIndex={0}
+      aria-label={
+        `${song.title}${song.artist ? `, ${song.artist}` : ''}` +
+        `${song.album ? `, from ${song.album}` : ''}`
+      }
       onDoubleClick={activate}
       onKeyDown={(event) => {
+        // Enter mirrors double-click, which runs the same `activate`.
         if (event.key === 'Enter') activate()
       }}
       className={cn(
-        'group grid h-11 items-center gap-3 rounded-md px-2 text-sm transition-colors',
-        'hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none',
+        'cv-row group grid h-11 items-center gap-3 rounded-md px-2 text-sm transition-colors',
+        'hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
         isActive && 'bg-accent-soft/60',
         onRemove && 'pr-1'
       )}
@@ -144,7 +153,7 @@ export const TrackRow = memo(function TrackRow({
             // invisible control.
             'hidden size-7 place-items-center rounded-full text-fg transition-colors',
             'hover:bg-surface-3 group-hover:grid group-focus-within:grid',
-            showPauseIcon && '!grid text-accent'
+            showPauseIcon && '!grid text-accent-strong'
           )}
         >
           {showPauseIcon ? <Pause className="size-3.5 fill-current" /> : <Play className="size-3.5 fill-current" />}
@@ -165,9 +174,9 @@ export const TrackRow = memo(function TrackRow({
       {/* Title / artist / album */}
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <span className={cn('truncate font-medium', isCurrent ? 'text-accent' : 'text-fg')}>{song.title}</span>
+          <span className={cn('truncate font-medium', isCurrent ? 'text-accent-strong' : 'text-fg')}>{song.title}</span>
           {song.userRating !== undefined && song.userRating > 0 && (
-            <span className="shrink-0 text-[10px] text-accent" title={`Your rating: ${song.userRating}/5`}>
+            <span className="shrink-0 text-[10px] text-accent-strong" title={`Your rating: ${song.userRating}/5`}>
               ★{song.userRating}
             </span>
           )}
@@ -234,7 +243,7 @@ export const TrackRow = memo(function TrackRow({
                 onStar(song)
               }}
             >
-              <Heart className={cn('size-3.5', song.starred ? 'fill-current text-accent' : '')} />
+              <Heart className={cn('size-3.5', song.starred ? 'fill-current text-accent-strong' : '')} />
             </IconButton>
           </Tooltip>
         )}
@@ -244,7 +253,7 @@ export const TrackRow = memo(function TrackRow({
               label="More actions"
               size="icon-xs"
               variant="ghost"
-              className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100"
+              className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
               onClick={(event) => event.stopPropagation()}
             >
               <MoreHorizontal className="size-3.5" />
@@ -291,7 +300,7 @@ export const TrackRow = memo(function TrackRow({
                         key={rating}
                         onSelect={() => onRate(song, rating)}
                         className={cn(
-                          song.userRating === rating && 'text-accent'
+                          song.userRating === rating && 'text-accent-strong'
                         )}
                       >
                         <span aria-hidden>{'★'.repeat(rating)}</span>
@@ -343,6 +352,10 @@ export function TrackHeader({
 }) {
   return (
     <div
+      // Decorative column labels. Each row carries its own `aria-label`, so
+      // exposing this as a table header would imply a table that does not
+      // exist and re-announce the column names on every row.
+      aria-hidden="true"
       className="grid h-8 items-center gap-3 border-b border-line px-2 text-[11px] font-semibold uppercase tracking-wide text-faint"
       style={{
         gridTemplateColumns: showArt

@@ -64,8 +64,23 @@ function installMenuActions(): void {
 
 /* --------------------------------------------------------------------- IPC */
 
+/**
+ * Registers a privileged handler, refusing anything not sent by our own window.
+ *
+ * `ipcMain.handle` accepts messages from any frame in any `webContents` the app
+ * owns. There is exactly one window here, so this is not a hole today — but it
+ * is the only thing standing between a compromised renderer and `safeStorage`,
+ * the network, and the filesystem. Checking the sender is one comparison, and it
+ * turns that assumption into an enforced invariant.
+ */
 function handle(channel: string, handler: (...args: never[]) => unknown): void {
-  ipcMain.handle(channel, (_event, ...args) => handler(...(args as never[])))
+  ipcMain.handle(channel, (event, ...args) => {
+    const window = getMainWindow()
+    if (!window || window.isDestroyed() || event.sender !== window.webContents) {
+      throw new Error(`Rejected '${channel}' from an unexpected sender`)
+    }
+    return handler(...(args as never[]))
+  })
 }
 
 function registerIpcHandlers(): void {

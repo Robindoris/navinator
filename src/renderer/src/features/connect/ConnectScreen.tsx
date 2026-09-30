@@ -150,7 +150,7 @@ export function ConnectScreen() {
                     >
                       <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-3">
                         {busy === profile.id ? (
-                          <Loader2 className="size-4 animate-spin text-accent" />
+                          <Loader2 className="size-4 animate-spin text-accent-strong" />
                         ) : (
                           <Server className="size-4 text-muted" />
                         )}
@@ -167,7 +167,7 @@ export function ConnectScreen() {
                       label={`Remove ${profile.name}`}
                       size="icon-xs"
                       variant="ghost"
-                      className="opacity-0 group-hover:opacity-100"
+                      className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
                       onClick={() => removeProfile(profile)}
                     >
                       <Trash2 className="size-3.5" />

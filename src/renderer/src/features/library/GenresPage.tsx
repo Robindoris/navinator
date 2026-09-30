@@ -4,14 +4,21 @@ import { Library, Play, Shuffle, Disc3 } from 'lucide-react'
 import { getSongsByGenre } from '../../lib/api'
 import { queryKeys, STALE } from '../../lib/query-keys'
 import { useServerId } from '../../store/server'
-import { useGenresQuery, usePlaySongs, useTrackAnnotations } from '../shared/hooks'
+import { useGenresQuery, usePlaySongs, useTrackAnnotations, useTrackRowActions } from '../shared/hooks'
 import { PageHeader } from '../shared/Page'
 import { Button, EmptyState, ErrorState, Skeleton } from '../../components/ui/primitives'
 import { CoverArt } from '../../components/items/CoverArt'
 import { TrackRow, TrackHeader } from '../../components/items/TrackRow'
-import { requestAddToPlaylist } from '../../components/items/AddToPlaylistDialog'
 import { usePlayer } from '../../store/player'
 import { formatCount } from '../../lib/utils'
+
+/**
+ * Hard cap on a single genre view.
+ *
+ * `getSongsByGenre` has no offset parameter, so this is the only lever. It is
+ * a page *size*, not a total — see the header below for how that is reported.
+ */
+const GENRE_TRACK_CAP = 500
 
 export function GenresPage() {
   const navigate = useNavigate()
@@ -71,14 +78,14 @@ export function GenrePage() {
   const serverId = useServerId()
   const playSongs = usePlaySongs()
   const addToQueue = usePlayer((s) => s.addToQueue)
-  const playNext = usePlayer((s) => s.playNextInQueue)
   const { onStar, onRate } = useTrackAnnotations()
+  const trackActions = useTrackRowActions()
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
   const shuffle = usePlayer((s) => s.shuffle)
 
   const { data: songs, isLoading, error, refetch } = useQuery({
     queryKey: queryKeys.songsByGenre(serverId!, genre),
-    queryFn: () => getSongsByGenre(genre, 500),
+    queryFn: () => getSongsByGenre(genre, GENRE_TRACK_CAP),
     enabled: Boolean(serverId && genre),
     staleTime: STALE.library
   })
@@ -86,6 +93,11 @@ export function GenrePage() {
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
 
   const list = songs ?? []
+  // Subsonic's `getSongsByGenre` returns one flat, unpaged array, so a large
+  // genre has to be truncated somewhere. It used to be truncated silently *and*
+  // counted with `list.length`, which meant a 5,000-track genre was reported as
+  // "500 tracks" — the UI stated something false. Say what was actually loaded.
+  const truncated = list.length >= GENRE_TRACK_CAP
 
   return (
     <div className="space-y-6">
@@ -99,7 +111,11 @@ export function GenrePage() {
           />
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-fg">{genre}</h1>
-            <p className="mt-0.5 text-sm text-muted">{formatCount(list.length, 'track')}</p>
+            <p className="mt-0.5 text-sm text-muted">
+              {truncated
+                ? `Showing the first ${formatCount(list.length, 'track')}`
+                : formatCount(list.length, 'track')}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -147,8 +163,7 @@ export function GenrePage() {
               showAlbum
               album={{ name: song.album, coverArt: song.coverArt }}
               onPlay={(target) => playSongs(list, target)}
-              onPlayNext={(items) => playNext(items)}
-              onAddToQueue={(items) => addToQueue(items)} onAddToPlaylist={(items) => requestAddToPlaylist(items.map((item) => item.id))}
+              {...trackActions}
               onStar={onStar}
               onRate={onRate}
             />

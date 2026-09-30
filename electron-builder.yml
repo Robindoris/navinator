@@ -10,15 +10,24 @@ directories:
   buildResources: resources
 
 files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!scripts/*'
+  # Allowlist, not a denylist. Anything added to the repo root later is a
+  # release-day surprise otherwise — docs screenshots and agent tooling dirs
+  # were both shipped inside every user's install before this was tightened.
+  - out/**/*
+  - package.json
+  # The compiled renderer needs no source maps at runtime.
+  - '!out/**/*.map'
+  # electron-builder always force-adds production `node_modules`, which is only
+  # `electron-updater` + `subsonic-api` since the renderer deps moved to
+  # devDependencies. Everything else there is docs, tests and type defs.
+  - '!node_modules/**/{test,__tests__,tests,example,examples,benchmark,benchmarks,docs,doc}/**'
+  - '!node_modules/**/*.{md,markdown,ts,tsx,mts,cts,flow,map}'
+  # Never ship repo-level sources, docs, or build metadata.
+  - '!{src,scripts,docs,resources,.a0proj,.github,.vscode,.idea,.qodo}/**'
+  - '!*.tsbuildinfo'
+  - '!{README,AGENTS,RELEASING,LICENSE,screenshot.ps1,eslint.config.js}'
   - '!electron.vite.config.ts'
-  - '!{.eslintrc,.prettierrc,.editorconfig,.gitignore}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-  # Build inputs only: electron-builder reads the icons and entitlements from
-  # here, nothing loads them at runtime.
-  - '!resources/*'
 
 win:
   icon: resources/icon.png

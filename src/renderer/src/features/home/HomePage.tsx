@@ -148,7 +148,7 @@ function JumpTile({
       onClick={onClick}
       className="group flex flex-col gap-2 rounded-app border border-line bg-surface p-4 text-left transition-colors hover:border-accent/40 hover:bg-surface-2"
     >
-      <Icon className="size-5 text-accent" />
+      <Icon className="size-5 text-accent-strong" />
       <span className="text-sm font-medium text-fg">{label}</span>
       {count ? <span className="text-xs text-faint">{formatCount(count, 'album')}</span> : null}
     </button>

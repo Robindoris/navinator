@@ -16,13 +16,42 @@ export function useKeyboardShortcuts(): void {
       return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
     }
 
+    /**
+     * Anything that owns the key we are about to handle.
+     *
+     * Two real bugs hide here if this is only `isTyping`:
+     *
+     *  1. Space activates buttons and links on *keyup*, via the browser's
+     *     default action on keydown. A global handler that calls
+     *     `preventDefault()` on Space therefore cancels activation for every
+     *     button, link and switch in the app and plays the track instead.
+     *  2. Radix's Slider handles arrow keys on its Root and calls
+     *     `preventDefault()` but not `stopPropagation()`, so the event still
+     *     reaches `window` — arrowing the *volume* slider would also skip the
+     *     track, and arrowing the *seek* slider would change the volume.
+     *
+     * So the transport keys are ignored whenever focus sits on a widget that
+     * legitimately consumes them.
+     */
+    const ownsKey = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false
+      return (
+        isTyping(target) ||
+        target.closest(
+          'button, a[href], [role="button"], [role="slider"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"], [role="option"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="combobox"], [role="listbox"], [role="spinbutton"], [role="textbox"], [contenteditable="true"]'
+        ) !== null
+      )
+    }
+
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (isTyping(event.target)) return
       const player = usePlayer.getState()
       const meta = event.metaKey || event.ctrlKey
 
       // Let the OS keep ⌘/Ctrl chords.
       if (meta) return
+
+      // Focus is inside a widget that has its own meaning for these keys.
+      if (ownsKey(event.target)) return
 
       switch (event.key) {
         case ' ':

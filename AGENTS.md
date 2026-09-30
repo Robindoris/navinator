@@ -9,6 +9,9 @@
   - `base: './'` in the renderer build, so all renderer asset URLs must be relative (packaged app loads over the `navinator:` scheme)
   - `@shared` aliases `src/shared` in main, preload and renderer
   - The renderer has no Node access; every privileged operation goes through the preload bridge
+  - **The preload is emitted as CommonJS (`out/preload/index.cjs`), not ESM.** Electron cannot load ESM imports in a *sandboxed* preload, and `window.ts` sets `sandbox: true` deliberately. Reverting the preload to `.mjs` silently forces `sandbox: false` and gives up renderer sandboxing
+  - **The CSP in `src/renderer/index.html` has no `script-src 'unsafe-inline'`.** Vite emits external modules and the app has no inline handlers, so it is unnecessary; `style-src 'unsafe-inline'` *is* required because React writes `style={{...}}` attributes
+  - Every `ipcMain.handle` registration goes through the `handle()` wrapper in `src/main/index.ts`, which rejects any sender that is not the main window
   - `resources/` holds build inputs only and is excluded from the packaged app. Nothing loads from it at runtime
   - Icon pipeline: `resources/navinator.png` is the master logo. `npm run icons` (`scripts/generate-icons.mjs`) decodes it and regenerates `resources/icon.png` (1024, electron-builder source), `resources/tray.png` (64) and `src/renderer/public/navinator.png` (512, favicon + in-app mark). Never hand-edit the generated files; replace the master and re-run
   - `electron-builder.yml` points mac entitlements at `resources/entitlements.mac.plist` and all three platforms at `resources/icon.png`
@@ -18,14 +21,21 @@
   - That workflow builds **one job per platform, not per architecture**, on purpose: `latest-mac.yml` and `latest.yml` are single manifests listing every arch for their platform, and splitting the arches across jobs makes them overwrite each other
   - The macOS `zip` target is not redundant with `dmg` — Squirrel.Mac applies updates from the zip. Dropping it breaks macOS auto-update only
   - `electron-updater` must stay in `dependencies`, not `devDependencies`. electron-builder only ships `dependencies` inside the asar, and `src/main/updater.ts` imports it at runtime
+  - **`dependencies` is for main/preload runtime imports only — currently `electron-updater` and `subsonic-api`, nothing else.** The renderer is fully bundled by Vite (no `externalizeDepsPlugin` on that target), so React, Radix, TanStack, lucide-react, zustand and sonner belong in `devDependencies`. Listing a renderer library in `dependencies` ships its raw source *inside the asar* on top of the already-compiled bundle — that is what made the asar 50 MB instead of 3 MB, with `lucide-react` alone accounting for 34 MB of it
+  - `electron.vite.config.ts` applies `externalizeDepsPlugin()` to main and preload only. Anything a main/preload `import` lands in the bundle; anything else stays external and therefore must exist in the asar
 - **Work Guidance**:
   - Add a dependency only after confirming it is already in `package.json`
+  - `electron-builder.yml` uses an `files` **allowlist** (`out/**/*`, `package.json`). Do not switch it back to a denylist — anything added to the repo root is otherwise shipped to every user, which is how `docs/screenshots` and `.a0proj/secrets.env` ended up inside the asar
   - Keep the preload bridge narrow; new privileged operations need an entry in `src/shared/ipc.ts`
   - A new keybinding goes in `src/shared/shortcuts.ts` once, not into `useShortcuts.ts` and the Settings table separately. That duplication is how `?` ended up dispatching an event nobody listened to
 - **Verification**:
-  - `npm run typecheck`
+  - `npm run verify` — typecheck, lint, tests and build in one go
+  - `npm test` — Node's built-in runner (`node --test`), **no test dependency**. It executes the TypeScript directly, which is why `allowImportingTsExtensions` is on in both tsconfigs and why `src/shared/types.ts` imports `./themes.ts` with an explicit extension
+  - Pure logic belongs in a module with no `electron`/`react`/`@tanstack` imports, so it is reachable from `tests/`. `src/renderer/src/lib/utils.ts`, `src/shared/{media,shortcuts,api-methods,themes,types}.ts` all qualify
   - `npx electron-vite build`
   - `npm run icons` after any logo change
   - `npx electron-builder --dir --mac` to confirm the packaged `.app` icon (`CFBundleIconFile` -> `icon.icns`)
   - After a dependency change, confirm it landed in the asar: `npx asar list release/mac-arm64/Navinator.app/Contents/Resources/app.asar | grep <pkg>`
+  - After changing what ships, compare asar size, not installer size: the Electron Framework is ~287 MB of every `.app`, so `app.asar` is the only number that reflects a dependency mistake
+  - `lib/addToPlaylist.ts` is its own module because `features/shared/hooks.ts` and `AddToPlaylistDialog.tsx` both need it and either location would create an import cycle. It must stay dependency-free
 - **Child DOX Index**: none

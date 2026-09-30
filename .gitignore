@@ -9,3 +9,9 @@ release/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Local agent/editor tooling state. `.a0proj` holds a secrets.env and a
+# variables.env; electron-builder's `files` allowlist already keeps it out of the
+# asar, but a directory that holds credentials must never be committable.
+.a0proj/
+.qodo/

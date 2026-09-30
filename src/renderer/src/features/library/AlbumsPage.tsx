@@ -95,6 +95,7 @@ export function AlbumsPage() {
 
       <div className="flex flex-wrap items-center gap-3">
         <Segmented
+          label="Sort albums by"
           value={view}
           onChange={(next) => navigate({ to: '/albums', search: { view: next } })}          options={VIEWS.map((item) => ({ value: item.value, label: item.label }))}
         />

@@ -205,7 +205,13 @@ export function PlayerBar({ lyricsOpen, onToggleLyrics }: { lyricsOpen: boolean;
               step={0.5}
               disabled={!song || displayDuration === 0}
               onValueChange={commitSeek}
-              className="relative z-10 py-1.5 [&_[role=slider]]:opacity-0"
+              aria-label="Seek"
+              aria-valuetext={formatDuration(displayPosition)}
+              // The thumb stays hidden until the track is hovered, but it must
+              // never be hidden while focused — an invisible focus target gives
+              // keyboard users no feedback at all, and `opacity: 0` hides the
+              // focus ring along with the thumb.
+              className="relative z-10 py-1.5 [&_[role=slider]]:opacity-0 [&_[role=slider]]:focus-visible:opacity-100 [&_[role=slider]]:focus-visible:outline-2 [&_[role=slider]]:focus-visible:-outline-offset-2 [&_[role=slider]]:focus-visible:outline-accent"
             />
           </div>
           <span className="tabular w-10 text-[11px] text-faint">{formatDuration(displayDuration)}</span>

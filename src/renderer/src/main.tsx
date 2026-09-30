@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from '@tanstack/react-router'
 import { router } from './router'
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import './styles/index.css'
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,9 +27,13 @@ if (!container) throw new Error('Root container is missing from index.html')
 
 createRoot(container).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      {/* `App` is the root route's component, rendered by the router. */}
-      <RouterProvider router={router} />
-    </QueryClientProvider>
+    {/* Outermost boundary: a throw in any provider, the router, or the whole
+        app leaves the user a readable screen and a way out, not a blank window. */}
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        {/* `App` is the root route's component, rendered by the router. */}
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </ErrorBoundary>
   </StrictMode>
 )

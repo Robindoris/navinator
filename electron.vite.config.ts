@@ -25,10 +25,14 @@ export default defineConfig({
       outDir: 'out/preload',
       rollupOptions: {
         input: { index: r('src/preload/index.ts') },
-        // ESM preload (`.mjs`) is the only format that works with a
-        // `"type": "module"` package — `.js` would be treated as ESM and
-        // break the `require` calls inside the CJS bundle.
-        output: { format: 'es', entryFileNames: '[name].mjs' }
+        // The preload is emitted as CommonJS with a `.cjs` extension on
+        // purpose. A *sandboxed* preload is run as plain JavaScript with no ESM
+        // context — Electron's own docs are explicit that "sandboxed preload
+        // scripts can't use ESM imports". Since this package is
+        // `"type": "module"`, a bare `.js` would be parsed as ESM anyway, hence
+        // `.cjs`. Staying ESM here would force `sandbox: false` in `window.ts`
+        // and give up renderer sandboxing for no benefit.
+        output: { format: 'cjs', entryFileNames: '[name].cjs' }
       }
     }
   },

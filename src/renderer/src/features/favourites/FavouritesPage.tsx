@@ -5,13 +5,13 @@ import {
   usePlayArtist,
   usePlaySongs,
   useStarredQuery,
-  useTrackAnnotations
+  useTrackAnnotations,
+  useTrackRowActions
 } from '../shared/hooks'
 import { PageHeader, Section, AlbumGrid } from '../shared/Page'
 import { Button, EmptyState, ErrorState, Skeleton } from '../../components/ui/primitives'
 import { ArtistCard } from '../../components/items/Cards'
 import { TrackRow, TrackHeader } from '../../components/items/TrackRow'
-import { requestAddToPlaylist } from '../../components/items/AddToPlaylistDialog'
 import { usePlayer } from '../../store/player'
 import { formatCount } from '../../lib/utils'
 
@@ -21,8 +21,8 @@ export function FavouritesPage() {
   const playSongs = usePlaySongs()
   const playArtist = usePlayArtist()
   const addToQueue = usePlayer((s) => s.addToQueue)
-  const playNext = usePlayer((s) => s.playNextInQueue)
   const { onStar, onRate } = useTrackAnnotations()
+  const trackActions = useTrackRowActions()
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
   const shuffle = usePlayer((s) => s.shuffle)
 
@@ -141,8 +141,7 @@ export function FavouritesPage() {
                 onPlay={(target) => playSongs(songs, target)}
                 onGoToAlbum={() => song.albumId && album(song.albumId)}
                 onGoToArtist={() => song.artistId && artist(song.artistId)}
-                onPlayNext={(items) => playNext(items)}
-                onAddToQueue={(items) => addToQueue(items)} onAddToPlaylist={(items) => requestAddToPlaylist(items.map((item) => item.id))}
+                {...trackActions}
                 onStar={onStar}
                 onRate={onRate}
               />

@@ -3,6 +3,7 @@ import type { Album } from '@shared/types'
 import { AlbumCard } from '../../components/items/Cards'
 import { Skeleton } from '../../components/ui/primitives'
 import { useSettings } from '../../store/settings'
+import { usePlayer } from '../../store/player'
 import { cn } from '../../lib/utils'
 
 export function PageHeader({
@@ -66,6 +67,20 @@ export function AlbumGrid({
 }) {
   const compact = useSettings((state) => state.settings.compactAlbumGrid)
 
+  /**
+   * One subscription for the whole grid, not one per card.
+   *
+   * `AlbumCard` used to read `queue[index]?.albumId` and `playing` from the
+   * store itself, so every store write — including the ~4/second `timeupdate`
+   * — ran 20,000 selectors on a 10,000-album library and re-rendered every card
+   * on each play/pause. Resolving it here makes the cost proportional to the
+   * number of *grids* on screen, which is one.
+   */
+  const currentAlbumId = usePlayer((state) =>
+    state.playing ? (state.queue[state.index]?.albumId ?? null) : null
+  )
+  const toggle = usePlayer((state) => state.toggle)
+
   if (loading) return <AlbumGridSkeleton compact={compact} />
 
   if (albums.length === 0) {
@@ -92,6 +107,8 @@ export function AlbumGrid({
         <AlbumCard
           key={album.id}
           album={album}
+          isPlaying={album.id === currentAlbumId}
+          onPause={toggle}
           onOpen={onOpen}
           onPlay={onPlay}
           dense={compact}

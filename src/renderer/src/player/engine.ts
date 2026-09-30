@@ -50,8 +50,8 @@ export class AudioEngine {
       deck.volume = i === 0 ? this.settings.volume : 0
       deck.addEventListener('ended', () => this.handleEnded(i))
       deck.addEventListener('error', () => this.handleError(i))
-      deck.addEventListener('play', () => this.emit(this.listeners.stateChange, !deck.paused))
-      deck.addEventListener('pause', () => this.emit(this.listeners.stateChange, !deck.paused))
+      deck.addEventListener('play', () => this.handleStateChange(i))
+      deck.addEventListener('pause', () => this.handleStateChange(i))
       deck.addEventListener('timeupdate', () => this.handleTimeUpdate(i))
     }
   }
@@ -145,6 +145,24 @@ export class AudioEngine {
     if (deckIndex !== this.active) return
     const song = this.queue[this.index]
     this.emit(this.listeners.error, `Could not play ${song?.title ?? 'track'}`)
+  }
+
+  /**
+   * Reports play/pause to the store, but only for the deck that is audible.
+   *
+   * The `deckIndex` guard is what makes this correct rather than merely
+   * redundant. `transitionTo` flips `active` *before* it pauses the outgoing
+   * deck, so without the guard that pause reports a deck the store already
+   * considers spent: the play/pause button flickers to ▶ for a frame and a
+   * spurious now-playing entry is written on every manual skip.
+   *
+   * With a crossfade configured it is worse than a flicker — the outgoing deck
+   * is only paused once the fade finishes, so the UI would claim "paused" for
+   * the entire fade (up to 8 s) while the incoming track is already audible.
+   */
+  private handleStateChange(deckIndex: number): void {
+    if (deckIndex !== this.active) return
+    this.emit(this.listeners.stateChange, !this.decks[deckIndex].paused)
   }
 
   private handleTimeUpdate(deckIndex: number): void {

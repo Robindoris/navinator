@@ -5,7 +5,9 @@
  * that it can be type-checked for every process target.
  */
 
-import { DEFAULT_ACCENT, type AccentTheme } from './themes'
+// Explicit extension: this module is loaded directly by `node --test`, whose
+// ESM resolver does not do extensionless lookup the way Vite and tsc do.
+import { DEFAULT_ACCENT, type AccentTheme } from './themes.ts'
 
 /* ------------------------------------------------------------------ servers */
 

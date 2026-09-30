@@ -6,10 +6,15 @@
     <!--
       No remote origins: the app is fully self-contained. `navinator:` is the
       main-process media proxy, everything else is the local bundle.
+
+      `script-src` deliberately has no `'unsafe-inline'`: Vite emits external
+      module scripts and the app has no inline handlers, so allowing inline
+      script would only weaken XSS protection. `style-src` does need it — React
+      writes `style={{...}}` attributes, which this directive governs.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' navinator: data: blob:; media-src 'self' navinator: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' navinator:;"
+      content="default-src 'self'; img-src 'self' navinator: data: blob:; media-src 'self' navinator: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' navinator:;"
     />
     <link rel="icon" type="image/png" href="./navinator.png" />
     <link rel="apple-touch-icon" href="./navinator.png" />

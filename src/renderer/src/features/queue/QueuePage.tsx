@@ -106,7 +106,12 @@ export function QueuePage() {
             onDragStart={() => setDragging(position)}
             onDragOver={(event) => {
               event.preventDefault()
-              setDropTarget(position)
+              // Guarded like `PlaylistsPage`: `onDragOver` fires continuously
+              // while the pointer is inside a row, and an unguarded
+              // `setDropTarget` re-renders every row in the queue each time —
+              // which on a long queue turns a single drag into a full-list
+              // reconcile per boundary crossed.
+              if (dropTarget !== position) setDropTarget(position)
             }}
             onDragEnd={() => {
               setDragging(null)
@@ -125,11 +130,38 @@ export function QueuePage() {
               dropTarget === position ? 'rounded-md ring-1 ring-accent' : 'rounded-md'
             }
           >
-            <div className="group flex items-center">
-              <div className="flex w-6 shrink-0 cursor-grab items-center justify-center text-faint opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing">
+            <div
+              className="group flex items-center"
+              onKeyDown={(event) => {
+                // HTML5 drag-and-drop is not keyboard-operable, so reordering
+                // the queue was impossible without a mouse. Alt+Arrow moves the
+                // focused row and keeps focus on it.
+                if (!event.altKey) return
+                const delta = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
+                if (delta === 0) return
+                const target = position + delta
+                if (target < 0 || target >= queue.length) return
+                event.preventDefault()
+                usePlayer.getState().moveInQueue(position, target)
+                // The row moves in the DOM, so restore focus to its new slot.
+                requestAnimationFrame(() => {
+                  document
+                    .querySelector<HTMLElement>(`[data-queue-row="${target}"]`)
+                    ?.querySelector<HTMLElement>('[data-queue-handle]')
+                    ?.focus()
+                })
+              }}
+            >
+              <div
+                data-queue-handle
+                tabIndex={0}
+                role="button"
+                aria-label={`Reorder ${song.title}. Position ${position + 1} of ${queue.length}. Use Alt with the arrow keys to move.`}
+                className="flex w-6 shrink-0 cursor-grab items-center justify-center rounded text-faint opacity-0 transition-opacity focus-visible:opacity-100 focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-accent-strong group-hover:opacity-100 active:cursor-grabbing"
+              >
                 <GripVertical className="size-3.5" />
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1" data-queue-row={position}>
                 <TrackRow
                   song={song}
                   index={position}
@@ -153,7 +185,7 @@ export function QueuePage() {
                     label="Remove from queue"
                     size="icon-xs"
                     variant="ghost"
-                    className="mr-1 shrink-0 opacity-0 group-hover:opacity-100"
+                    className="mr-1 shrink-0 opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
                     onClick={() => removeAt(position)}
                   >
                     <X className="size-3.5" />

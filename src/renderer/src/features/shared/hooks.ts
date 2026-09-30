@@ -1,10 +1,11 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import type { Song, Album, Playlist } from '@shared/types'
 import { useServerId } from '../../store/server'
 import { usePlayer } from '../../store/player'
+import { requestAddToPlaylist } from '../../lib/addToPlaylist'
 import { queryKeys, STALE } from '../../lib/query-keys'
 import {
   getAlbum,
@@ -463,4 +464,34 @@ export function useTrackAnnotations() {
       [rate]
     )
   }
+}
+
+/**
+ * Stable `TrackRow` action props.
+ *
+ * `TrackRow` is wrapped in `memo`, but each of these was an inline arrow at
+ * every call site, so the shallow compare saw a new function identity on every
+ * render and re-rendered every row regardless — a 500-row genre view reconciled
+ * in full for nothing, which is precisely what the `memo` was added to prevent.
+ *
+ * `playNext` and `addToQueue` are zustand store actions and therefore already
+ * stable; `requestAddToPlaylist` lives in `lib/addToPlaylist` precisely so this
+ * hook can reach it without an import cycle. Named to match the props, so call
+ * sites can spread: `<TrackRow {...trackActions} />`.
+ */
+export function useTrackRowActions(): {
+  onPlayNext: (items: Song[]) => void
+  onAddToQueue: (items: Song[]) => void
+  onAddToPlaylist: (items: Song[]) => void
+} {
+  const addToQueue = usePlayer((s) => s.addToQueue)
+  const playNext = usePlayer((s) => s.playNextInQueue)
+  return useMemo(
+    () => ({
+      onPlayNext: (items: Song[]) => playNext(items),
+      onAddToQueue: (items: Song[]) => addToQueue(items),
+      onAddToPlaylist: (items: Song[]) => requestAddToPlaylist(items.map((item) => item.id))
+    }),
+    [playNext, addToQueue]
+  )
 }

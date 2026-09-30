@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
-import { useServer } from '../../store/server'
+import { useServer, useServerId } from '../../store/server'
 import { usePlayer } from '../../store/player'
+import { queryKeys } from '../../lib/query-keys'
 import { cn } from '../../lib/utils'
 import { IconButton } from '../ui/primitives'
 import { Tooltip } from '../ui/overlays'
@@ -16,6 +17,7 @@ import { Button } from '../ui/primitives'
  */
 export function TitleBar() {
   const queryClient = useQueryClient()
+  const serverId = useServerId()
   const profile = useServer((s) => s.connection.profile)
   const state = useServer((s) => s.connection.state)
   const serverVersion = useServer((s) => s.connection.serverVersion)
@@ -74,7 +76,17 @@ export function TitleBar() {
             label="Refresh"
             size="icon-sm"
             variant="ghost"
-            onClick={() => queryClient.invalidateQueries()}
+            onClick={() => {
+              // Scoped to the active server on purpose. A bare
+              // `invalidateQueries()` marks every query stale, and for
+              // `useInfiniteQuery` that means refetching every loaded page
+              // sequentially — 100 requests on a fully scrolled 10k library for
+              // a button labelled "Refresh". Still not enough on its own for
+              // the album list, which is fetched in pages and cannot be
+              // refetched "all at once" by react-query.
+              if (!serverId) return
+              void queryClient.invalidateQueries({ queryKey: queryKeys.root(serverId) })
+            }}
           >
             <RefreshCw className="size-4" />
           </IconButton>

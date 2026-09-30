@@ -116,7 +116,7 @@ export function RadioPage() {
                   type="button"
                   onClick={() => playStation(station)}
                   aria-label={isCurrent ? `Pause ${station.name}` : `Play ${station.name}`}
-                  className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-3 text-accent transition-colors hover:bg-surface-2"
+                  className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-3 text-accent-strong transition-colors hover:bg-surface-2"
                 >
                   {isCurrent && playing ? (
                     <Pause className="size-4 fill-current" />
@@ -126,7 +126,7 @@ export function RadioPage() {
                 </button>
 
                 <span className="min-w-0 flex-1">
-                  <span className={`block truncate text-sm font-medium ${isCurrent ? 'text-accent' : 'text-fg'}`}>
+                  <span className={`block truncate text-sm font-medium ${isCurrent ? 'text-accent-strong' : 'text-fg'}`}>
                     {station.name}
                   </span>
                   <span className="block truncate text-xs text-muted">{station.streamUrl}</span>

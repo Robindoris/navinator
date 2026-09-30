@@ -38,6 +38,14 @@ const RELAYED_HEADERS = [
   'expires'
 ] as const
 
+/**
+ * Vite names every emitted asset with a content hash (`index-BRFLEVLV.js`), so
+ * a changed byte always means a changed name. Those are immutable and can be
+ * cached indefinitely; only `index.html` can point at a different hash and must
+ * be revalidated.
+ */
+const HASHED_ASSET = /-[A-Za-z0-9_-]{8}\.[a-z0-9]+$/
+
 function errorResponse(message: string, status = 502): Response {
   return new Response(message, {
     status,
@@ -68,13 +76,20 @@ function serveAppAsset(pathname: string): Promise<Response> {
 
   const extension = extname(target).toLowerCase()
 
+  // `no-cache` without a validator still forces a full re-read, so hashed assets
+  // get a real long-lived cache entry and only the HTML entry point pays for a
+  // revalidation on every launch.
+  const cacheControl = HASHED_ASSET.test(relative)
+    ? 'public, max-age=31536000, immutable'
+    : 'no-cache'
+
   return readFile(target).then(
     (body) =>
       new Response(new Uint8Array(body), {
         status: 200,
         headers: {
           'content-type': CONTENT_TYPES[extension] ?? 'application/octet-stream',
-          'cache-control': 'no-cache'
+          'cache-control': cacheControl
         }
       }),
     () => errorResponse('Not found', 404)

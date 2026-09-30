@@ -14,7 +14,8 @@ import {
   usePlaySongs,
   usePlaylistsQuery,
   usePlaylistQuery,
-  useTrackAnnotations
+  useTrackAnnotations,
+  useTrackRowActions
 } from '../shared/hooks'
 import { PageHeader } from '../shared/Page'
 import {
@@ -38,7 +39,6 @@ import {
 } from '../../components/ui/overlays'
 import { PlaylistCard } from '../../components/items/Cards'
 import { TrackRow, TrackHeader } from '../../components/items/TrackRow'
-import { requestAddToPlaylist } from '../../components/items/AddToPlaylistDialog'
 import { CoverArt } from '../../components/items/CoverArt'
 import { usePlayer } from '../../store/player'
 import { cn, formatCount, formatTotalDuration } from '../../lib/utils'
@@ -206,8 +206,8 @@ export function PlaylistPage() {
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
   const shuffle = usePlayer((s) => s.shuffle)
   const addToQueue = usePlayer((s) => s.addToQueue)
-  const playNext = usePlayer((s) => s.playNextInQueue)
   const { onStar, onRate } = useTrackAnnotations()
+  const trackActions = useTrackRowActions()
 
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState('')
@@ -434,9 +434,7 @@ export function PlaylistPage() {
                 showAlbum
                 album={{ name: song.album, coverArt: song.coverArt }}
                 onPlay={(target) => playSongs(songs, target)}
-                onPlayNext={(items) => playNext(items)}
-                onAddToQueue={(items) => addToQueue(items)}
-                onAddToPlaylist={(items) => requestAddToPlaylist(items.map((item) => item.id))}
+                {...trackActions}
                 onStar={onStar}
                 onRate={onRate}
                 onDownload={trackDownload}

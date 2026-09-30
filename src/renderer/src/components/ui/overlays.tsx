@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, useRef } from 'react'
 import * as TooltipPrimitive from '@radix-ui/react-tooltip'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import * as DropdownPrimitive from '@radix-ui/react-dropdown-menu'
@@ -56,13 +56,40 @@ export function DialogContent({
   className?: string
   footer?: React.ReactNode
 }) {
+  /**
+   * Radix's FocusScope snapshots `document.activeElement`, which is `<body>`
+   * when a dialog is opened programmatically (neither dialog here uses
+   * `DialogTrigger`). On close it therefore restored focus to `<body>`, and the
+   * next Tab restarted at the top of the app.
+   *
+   * `onOpenAutoFocus` runs *before* FocusScope moves focus, so that is the one
+   * moment the real opener is still known. Captured here and restored on close.
+   */
+  const openerRef = useRef<HTMLElement | null>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/55 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
       <DialogPrimitive.Content
+        ref={contentRef}
+        tabIndex={-1}
+        onOpenAutoFocus={(event) => {
+          openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+          event.preventDefault()
+          // Focus the panel itself rather than letting Radix land on the first
+          // tabbable descendant, which is the Close button. Focusing the panel
+          // is what makes a screen reader announce the dialog's title and
+          // description at all.
+          contentRef.current?.focus()
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          openerRef.current?.focus()
+        }}
         className={cn(
           'fixed left-1/2 top-1/2 z-50 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2',
-          'rounded-app border border-line bg-surface p-5 shadow-[var(--nav-shadow-lg)]',
+          'rounded-app border border-line bg-surface p-5 shadow-[var(--nav-shadow-lg)] focus:outline-none',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
           className
         )}
@@ -268,30 +295,70 @@ export function Segmented<T extends string>({
   value,
   onChange,
   options,
+  label,
   className
 }: {
   value: T
   onChange: (value: T) => void
   options: { value: T; label: string }[]
+  /** Required: without it the group is an unlabelled set of buttons. */
+  label: string
   className?: string
 }) {
+  const refs = useRef<(HTMLButtonElement | null)[]>([])
+
+  /**
+   * A `radiogroup` is one tab stop, with arrow keys moving between options.
+   * Previously every option was its own tab stop and selection was conveyed by
+   * colour alone, so the state of the Dark/Light/System switch — and the 8-way
+   * album sort — was invisible to assistive tech.
+   */
+  const onKeyDown = (event: React.KeyboardEvent, index: number): void => {
+    const last = options.length - 1
+    let next: number | null = null
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = index === last ? 0 : index + 1
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = index === 0 ? last : index - 1
+    else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = last
+    if (next === null) return
+    event.preventDefault()
+    const option = options[next]
+    if (!option) return
+    onChange(option.value)
+    refs.current[next]?.focus()
+  }
+
   return (
-    <div className={cn('inline-flex gap-0.5 rounded-lg bg-surface-2 p-0.5', className)}>
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => onChange(option.value)}
-          className={cn(
-            'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-            value === option.value
-              ? 'bg-surface text-fg shadow-sm'
-              : 'text-muted hover:text-fg'
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={cn('inline-flex gap-0.5 rounded-lg bg-surface-2 p-0.5', className)}
+    >
+      {options.map((option, index) => {
+        const selected = value === option.value
+        return (
+          <button
+            key={option.value}
+            ref={(node) => {
+              refs.current[index] = node
+            }}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            // Roving tabindex: exactly one option is reachable by Tab.
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(option.value)}
+            onKeyDown={(event) => onKeyDown(event, index)}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+              'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-strong',
+              selected ? 'bg-surface text-fg shadow-sm' : 'text-muted hover:text-fg'
+            )}
+          >
+            {option.label}
+          </button>
+        )
+      })}
     </div>
   )
 }

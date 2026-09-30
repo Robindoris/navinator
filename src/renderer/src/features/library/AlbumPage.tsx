@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { Play, Shuffle, Heart, Plus, Clock, Music2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,6 +14,10 @@ import { requestAddToPlaylist } from '../../components/items/AddToPlaylistDialog
 import { CoverArt } from '../../components/items/CoverArt'
 import { usePlayer } from '../../store/player'
 import { formatCount, formatTotalDuration, groupByDisc } from '../../lib/utils'
+import type { Song } from '@shared/types'
+
+/** Stable empty array: `?? []` would hand `useCallback` a new identity every render. */
+const EMPTY_SONGS: Song[] = []
 
 export function AlbumPage() {
   const { albumId } = useParams({ from: '/album/$albumId' })
@@ -25,6 +30,21 @@ export function AlbumPage() {
   const shuffle = usePlayer((s) => s.shuffle)
 
   const { data: album, isLoading, error, refetch } = useAlbumQuery(albumId)
+
+  /**
+   * `TrackRow` is memoised, but `memo` compares props shallowly — an inline
+   * arrow is a new function identity on every render, so an album with 60
+   * tracks re-rendered every row whenever this page did anything. These are
+   * stable so the memo can actually do its job.
+   */
+  const songs = album?.songList ?? EMPTY_SONGS
+  const playFrom = useCallback((target: number) => playSongs(songs, target), [playSongs, songs])
+  const playNextHere = useCallback((list: Song[]) => playNext(list), [playNext])
+  const addHere = useCallback((list: Song[]) => addToQueue(list), [addToQueue])
+  const addToPlaylistHere = useCallback(
+    (list: Song[]) => requestAddToPlaylist(list.map((item) => item.id)),
+    []
+  )
 
   if (error) return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />
 
@@ -46,7 +66,6 @@ export function AlbumPage() {
     )
   }
 
-  const songs = album.songList ?? []
   const discs = groupByDisc(songs)
 
   const play = () => {
@@ -126,7 +145,7 @@ export function AlbumPage() {
               variant="secondary"
               onClick={() => songs[0] && onStar(songs[0])}
             >
-              <Heart className={album.starred ? 'size-4 fill-current text-accent' : 'size-4'} />
+              <Heart className={album.starred ? 'size-4 fill-current text-accent-strong' : 'size-4'} />
             </IconButton>
             <Button
               variant="ghost"
@@ -185,11 +204,11 @@ export function AlbumPage() {
                       song={song}
                       index={offset + index}
                       showArt={false}
-                      onPlay={(target) => playSongs(songs, target)}
+                      onPlay={playFrom}
                       onGoToArtist={song.artistId ? () => artist(song.artistId!) : undefined}
-                      onPlayNext={(list) => playNext(list)}
-                      onAddToQueue={(list) => addToQueue(list)}
-                      onAddToPlaylist={(list) => requestAddToPlaylist(list.map((item) => item.id))}
+                      onPlayNext={playNextHere}
+                      onAddToQueue={addHere}
+                      onAddToPlaylist={addToPlaylistHere}
                       onStar={(item) => void onStar(item)}
                       onRate={(item, rating) => void onRate(item, rating)}
                     />

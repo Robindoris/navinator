@@ -6,10 +6,11 @@ import { useServerId } from '../../store/server'
 import { queryKeys } from '../../lib/query-keys'
 import { createPlaylist, updatePlaylist } from '../../lib/api'
 import { usePlaylistsQuery } from '../../features/shared/hooks'
+import { ADD_TO_PLAYLIST_EVENT } from '../../lib/addToPlaylist'
 import { Dialog, DialogContent } from '../ui/overlays'
 import { Button, Input, Spinner, Field } from '../ui/primitives'
 
-const ADD_TO_PLAYLIST_EVENT = 'navinator:add-to-playlist'
+
 
 /**
  * Opens the "add to playlist" sheet for the given tracks.
@@ -19,10 +20,7 @@ const ADD_TO_PLAYLIST_EVENT = 'navinator:add-to-playlist'
  * window event keeps the row dumb and lets one dialog instance live in
  * `AppShell`, matching how `navinator:focus-search` already works.
  */
-export function requestAddToPlaylist(songIds: string[]): void {
-  if (songIds.length === 0) return
-  window.dispatchEvent(new CustomEvent<string[]>(ADD_TO_PLAYLIST_EVENT, { detail: songIds }))
-}
+export { requestAddToPlaylist, ADD_TO_PLAYLIST_EVENT } from '../../lib/addToPlaylist'
 
 /** Mounts exactly one `AddToPlaylistDialog` and connects it to the event. */
 export function AddToPlaylistHost() {

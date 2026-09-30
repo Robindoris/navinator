@@ -40,10 +40,60 @@ const { autoUpdater } = require('electron-updater') as typeof import('electron-u
 
 type Publish = (state: UpdateState) => void
 
+/** Long enough for a real diagnosis, short enough to read in a toast. */
+const MAX_SUMMARY = 200
+
+/**
+ * `autoUpdater` builds its GitHub provider from electron-builder's `publish`
+ * block, and that provider resolves "latest" via GitHub's `/releases/latest`.
+ * GitHub answers **406** when a repository has no non-prerelease release, so
+ * during an alpha period — when every tag is a prerelease, which is what
+ * `RELEASING.md` prescribes — the check failed on every single launch.
+ *
+ * A 406 is not a fault: there genuinely is no newer *stable* build to move to,
+ * which is exactly the "up to date" state. Treating it as an error produced a
+ * multi-kilobyte console dump on every start and could not produce a useful
+ * toast. Prereleases are deliberately not offered as auto-update targets.
+ */
+function isNoStableRelease(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return (
+    /HttpError: 406\b/.test(message) ||
+    /ensure a production release exists/i.test(message) ||
+    /Cannot parse releases feed/.test(message)
+  )
+}
+
+/**
+ * A failed feed fetch carries the entire HTTP response inside `error.message`:
+ * the status line, every `set-cookie`, the CSP header, and often the whole Atom
+ * feed. That is several kilobytes of GitHub response headers ending up in a
+ * toast description and a console line on every single launch.
+ *
+ * The useful part is the first line, so only that is surfaced. electron-updater
+ * still writes the full error to the terminal itself, so nothing is lost for
+ * debugging — this just stops the app from repeating it.
+ */
+function summarise(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  const firstLine = (raw.split('\n')[0] ?? raw).replace(/^(?:Error:\s*)+/, '').trim()
+  if (!firstLine) return 'Could not check for updates'
+  return firstLine.length > MAX_SUMMARY
+    ? `${firstLine.slice(0, MAX_SUMMARY - 1)}…`
+    : firstLine
+}
+
 let publish: Publish = () => {}
 let wired = false
 /** Whether the in-flight check was started by the user rather than on launch. */
 let lastCheckWasManual = false
+/**
+ * `autoUpdater.checkForUpdates()` both rejects *and* emits `error` for a single
+ * failure, so handling each independently reported every problem twice. Set
+ * while a check is in flight: the first of the two to arrive reports, the
+ * second sees the flag and stands down.
+ */
+let checkInFlight = false
 
 /** Mirrors the current updater status to whichever renderer is listening. */
 export function onUpdateState(listener: Publish): void {
@@ -71,6 +121,23 @@ export function isUpdaterAvailable(): boolean {
   )
 }
 
+/**
+ * Single place a failed check turns into user-visible state, so the `error`
+ * event and the promise rejection cannot disagree or double up.
+ */
+function reportCheckFailure(error: unknown, manual: boolean): void {
+  if (isNoStableRelease(error)) {
+    // Quiet by design: an alpha user has nothing to update to, and saying so on
+    // every launch would be noise rather than information.
+    console.log('[updater] no published stable release to update to')
+    emit({ kind: 'up-to-date' })
+    return
+  }
+  const message = summarise(error)
+  console.warn(`[updater] ${message}`)
+  emit({ kind: 'error', message, manual })
+}
+
 export function wireUpdater(): void {
   if (wired || !isUpdaterAvailable()) return
   wired = true
@@ -87,13 +154,14 @@ export function wireUpdater(): void {
     emit({ kind: 'downloading', percent: Math.round(progress.percent) })
   )
   autoUpdater.on('update-downloaded', (info) => emit({ kind: 'downloaded', version: info.version }))
-  autoUpdater.on('error', (error) =>
-    emit({
-      kind: 'error',
-      message: error instanceof Error ? error.message : String(error),
-      manual: lastCheckWasManual
-    })
-  )
+  autoUpdater.on('error', (error) => {
+    if (checkInFlight) {
+      // The rejection from `checkForUpdates()` carries the same failure and is
+      // handled below, with the same outcome.
+      return
+    }
+    reportCheckFailure(error, lastCheckWasManual)
+  })
 }
 
 /** Starts a check, honouring the user's opt-out. */
@@ -110,6 +178,7 @@ export function checkForUpdates(manual: boolean): void {
 
   lastCheckWasManual = manual
   emit({ kind: 'checking' })
+  checkInFlight = true
   // Never let an unreachable feed surface as an unhandled rejection.
   void autoUpdater
     .checkForUpdates()
@@ -118,11 +187,10 @@ export function checkForUpdates(manual: boolean): void {
       // background check that failed. A repo with no published release answers
       // 406 forever, and toasting about it on every single launch would be
       // indefensible.
-      emit({
-        kind: 'error',
-        message: error instanceof Error ? error.message : String(error),
-        manual
-      })
+      reportCheckFailure(error, manual)
+    })
+    .finally(() => {
+      checkInFlight = false
     })
 }
 

@@ -91,7 +91,7 @@ export function LyricsPanel({ onClose }: { onClose: () => void }) {
               onClick={() => setLangIndex(index)}
               className={cn(
                 'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors',
-                index === langIndex ? 'bg-accent-soft text-accent' : 'text-faint hover:text-fg'
+                index === langIndex ? 'bg-accent-soft text-accent-strong' : 'text-faint hover:text-fg'
               )}
             >
               {entry.lang ?? `#${index + 1}`}
@@ -164,10 +164,26 @@ function LyricLine({
     <p
       ref={ref}
       onClick={onSeek}
+      // Clicking a line seeks to it, so it is a real control: without these it
+      // was mouse-only and invisible to assistive tech despite looking and
+      // behaving like a button. Enter and Space mirror the click; ArrowUp /
+      // ArrowDown step through the panel so it is reachable at all.
+      role={onSeek ? 'button' : undefined}
+      tabIndex={onSeek ? 0 : undefined}
+      onKeyDown={
+        onSeek
+          ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                onSeek()
+              }
+            }
+          : undefined
+      }
       className={cn(
         'rounded-md px-2 py-1 text-sm leading-relaxed transition-colors',
         active ? 'font-medium text-fg' : 'text-faint',
-        onSeek && 'cursor-pointer hover:text-muted'
+        onSeek && 'cursor-pointer hover:text-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-strong'
       )}
     >
       {words?.length
@@ -181,7 +197,7 @@ function LyricLine({
                 key={`${index}-${word.value}`}
                 className={cn(
                   'transition-colors',
-                  active && time >= start && time < nextStart ? 'text-accent' : active ? 'text-fg' : undefined
+                  active && time >= start && time < nextStart ? 'text-accent-strong' : active ? 'text-fg' : undefined
                 )}
               >
                 {word.value}{' '}

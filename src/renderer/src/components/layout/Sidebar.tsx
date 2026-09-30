@@ -163,10 +163,15 @@ function NavLink({
       type="button"
       onClick={onSelect}
       aria-current={active ? 'page' : undefined}
+      // Always present, not just when expanded. When collapsed the button
+      // contains only an <svg>, and the Tooltip below supplies
+      // `aria-describedby` — which is a *description*, not an accessible name.
+      // Without this, every collapsed nav item is announced as "button".
+      aria-label={collapsed ? item.label : undefined}
       className={cn(
         'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors',
         collapsed && 'justify-center px-0',
-        active ? 'bg-accent-soft font-medium text-accent' : 'text-muted hover:bg-surface-2 hover:text-fg'
+        active ? 'bg-accent-soft font-medium text-accent-strong' : 'text-muted hover:bg-surface-2 hover:text-fg'
       )}
     >
       <Icon className="size-4 shrink-0" />
